@@ -139,37 +139,43 @@ export class UIManager {
       const urlString = shareUrl.toString();
 
       try {
-        if (navigator.share) {
-          await navigator.share({
-            title: 'Dołącz do wspólnego rysowania w CoDraw',
-            text: `Zapraszam do wspólnego rysowania w pokoju "${this.sync.roomName}"!`,
-            url: urlString
-          });
-        } else {
-          await navigator.clipboard.writeText(urlString);
-          
-          // Micro-interaction: Change button icon to checkmark for success feedback
-          const icon = this.shareBtn.querySelector('i');
-          const originalTitle = this.shareBtn.getAttribute('title');
-          
+        await navigator.clipboard.writeText(urlString);
+        
+        // Micro-interaction: Change button icon to checkmark for success feedback
+        const icon = this.shareBtn.querySelector('i');
+        const originalTitle = this.shareBtn.getAttribute('title');
+        
+        if (icon) {
+          icon.setAttribute('data-lucide', 'check');
+          if (window.lucide) window.lucide.createIcons();
+        }
+        this.shareBtn.classList.replace('text-slate-400', 'text-emerald-400');
+        this.shareBtn.setAttribute('title', 'Skopiowano link!');
+        
+        setTimeout(() => {
           if (icon) {
-            icon.setAttribute('data-lucide', 'check');
+            icon.setAttribute('data-lucide', 'share-2');
             if (window.lucide) window.lucide.createIcons();
           }
-          this.shareBtn.classList.replace('text-slate-400', 'text-emerald-400');
-          this.shareBtn.setAttribute('title', 'Skopiowano link!');
-          
-          setTimeout(() => {
-            if (icon) {
-              icon.setAttribute('data-lucide', 'share-2');
-              if (window.lucide) window.lucide.createIcons();
-            }
-            this.shareBtn.classList.replace('text-emerald-400', 'text-slate-400');
-            this.shareBtn.setAttribute('title', originalTitle);
-          }, 2000);
-        }
+          this.shareBtn.classList.replace('text-emerald-400', 'text-slate-400');
+          this.shareBtn.setAttribute('title', originalTitle);
+        }, 2000);
       } catch (err) {
-        console.error('Błąd udostępniania:', err);
+        console.error('Błąd kopiowania do schowka:', err);
+        // Fallback for older browsers
+        try {
+          const textArea = document.createElement("textarea");
+          textArea.value = urlString;
+          textArea.style.position = "fixed";
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          alert('Link skopiowano do schowka!');
+        } catch (fallbackErr) {
+          alert('Nie udało się skopiować linku. Skopiuj go ręcznie: ' + urlString);
+        }
       }
     });
   }
