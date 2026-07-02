@@ -59,10 +59,85 @@ export class CanvasManager {
     }
   }
 
+  getRelativePointerPosition() {
+    const pos = this.stage.getPointerPosition();
+    if (!pos) return null;
+    const transform = this.stage.getAbsoluteTransform().copy().invert();
+    return transform.point(pos);
+  }
+
+  cancelLocalDrawing() {
+    this.isDrawing = false;
+    if (this.tempLine) {
+      this.tempLine.destroy();
+      this.tempLine = null;
+    }
+    this.activeShapeId = null;
+    this.activeShapePoints = [];
+    this.activeYShape = null;
+  }
+
+  setTool(tool) {
+    this.currentTool = tool;
+    if (tool === 'pan') {
+      this.stage.draggable(true);
+    } else {
+      this.stage.draggable(false);
+      if (this.stage.isDragging()) {
+        this.stage.stopDrag();
+      }
+    }
+  }
+
+  zoomStage(scaleFactor, center = null) {
+    const oldScale = this.stage.scaleX();
+    
+    // Zoom center: default to stage center if not provided
+    const pointer = center || { x: this.stage.width() / 2, y: this.stage.height() / 2 };
+    
+    const mousePointTo = {
+      x: (pointer.x - this.stage.x()) / oldScale,
+      y: (pointer.y - this.stage.y()) / oldScale,
+    };
+
+    const newScale = Math.max(0.1, Math.min(10, oldScale * scaleFactor));
+    this.stage.scale({ x: newScale, y: newScale });
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+    this.stage.position(newPos);
+    this.stage.batchDraw();
+    
+    // Trigger cursor update so peers see the local cursor move on zoom
+    if (this.onCursorMove) {
+      const curPos = this.stage.getPointerPosition();
+      if (curPos) {
+        const normPos = this.getRelativePointerPosition();
+        if (normPos) this.onCursorMove(normPos.x, normPos.y);
+      }
+    }
+  }
+
+  resetZoom() {
+    this.stage.scale({ x: 1, y: 1 });
+    this.stage.position({ x: 0, y: 0 });
+    this.stage.batchDraw();
+  }
+
   // 2. Local Touch and Mouse Interactions
   setupDrawingListeners() {
-    // Stage events handle coordinate normalization automatically
     this.stage.on('mousedown touchstart', (e) => {
+      // If we are in panning mode, ignore drawing start
+      if (this.currentTool === 'pan') return;
+
+      // Cancel drawing if multi-touch gesture starts
+      if (e.evt.touches && e.evt.touches.length > 1) {
+        this.cancelLocalDrawing();
+        return;
+      }
+
       if (!this.activeLayerId) return;
 
       const layer = this.layers.get(this.activeLayerId);
@@ -70,7 +145,7 @@ export class CanvasManager {
       if (!layer || !layer.visible()) return;
 
       this.isDrawing = true;
-      const pos = this.stage.getPointerPosition();
+      const pos = this.getRelativePointerPosition();
       if (!pos) return;
 
       this.activeShapeId = `shape_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -84,7 +159,7 @@ export class CanvasManager {
         lineCap: 'round',
         lineJoin: 'round',
         points: [...this.activeShapePoints],
-        listening: false // Optimization: do not trigger hover/click events on lines
+        listening: false
       });
 
       layer.add(this.tempLine);
@@ -107,12 +182,12 @@ export class CanvasManager {
     });
 
     this.stage.on('mousemove touchmove', (e) => {
-      const pos = this.stage.getPointerPosition();
-      if (!pos) return;
+      const normPos = this.getRelativePointerPosition();
+      if (!normPos) return;
 
-      // Sync local cursor state with awareness
+      // Sync local cursor state with awareness using normalized coordinates
       if (this.onCursorMove) {
-        this.onCursorMove(pos.x, pos.y);
+        this.onCursorMove(normPos.x, normPos.y);
       }
 
       if (!this.isDrawing || !this.tempLine) return;
@@ -122,7 +197,7 @@ export class CanvasManager {
         e.evt.preventDefault();
       }
 
-      this.activeShapePoints.push(pos.x, pos.y);
+      this.activeShapePoints.push(normPos.x, normPos.y);
       
       // Update temporary visual line
       this.tempLine.points([...this.activeShapePoints]);
@@ -134,7 +209,7 @@ export class CanvasManager {
 
       // Sync incremental coordinates with Yjs
       if (this.activeYShape && this.onLocalStrokeMove) {
-        this.onLocalStrokeMove(this.activeYShape, [pos.x, pos.y]);
+        this.onLocalStrokeMove(this.activeYShape, [normPos.x, normPos.y]);
       }
     });
 
@@ -177,6 +252,90 @@ export class CanvasManager {
         this.onLocalStrokeEnd();
       }
     });
+
+    // 3. Desktop Mouse Wheel Zoom
+    this.stage.on('wheel', (e) => {
+      e.evt.preventDefault();
+      const scaleBy = 1.05;
+      const factor = e.evt.deltaY < 0 ? scaleBy : 1 / scaleBy;
+      const pointer = this.stage.getPointerPosition();
+      this.zoomStage(factor, pointer);
+    });
+
+    // 4. Mobile Multi-Touch Pinch Zoom and Two-Finger Pan
+    let lastDist = 0;
+    let lastCenter = null;
+
+    const getTouchDistance = (t1, t2) => {
+      return Math.sqrt(Math.pow(t1.clientX - t2.clientX, 2) + Math.pow(t1.clientY - t2.clientY, 2));
+    };
+
+    const getTouchCenter = (t1, t2) => {
+      const rect = this.stage.container().getBoundingClientRect();
+      return {
+        x: ((t1.clientX + t2.clientX) / 2) - rect.left,
+        y: ((t1.clientY + t2.clientY) / 2) - rect.top
+      };
+    };
+
+    this.stage.on('touchstart', (e) => {
+      if (e.evt.touches && e.evt.touches.length === 2) {
+        // Cancel single-finger drawing if active
+        this.cancelLocalDrawing();
+
+        if (this.stage.isDragging()) {
+          this.stage.stopDrag();
+        }
+
+        const t1 = e.evt.touches[0];
+        const t2 = e.evt.touches[1];
+        lastDist = getTouchDistance(t1, t2);
+        lastCenter = getTouchCenter(t1, t2);
+      }
+    });
+
+    this.stage.on('touchmove', (e) => {
+      if (e.evt.touches && e.evt.touches.length === 2) {
+        e.evt.preventDefault();
+
+        if (this.stage.isDragging()) {
+          this.stage.stopDrag();
+        }
+
+        const t1 = e.evt.touches[0];
+        const t2 = e.evt.touches[1];
+        
+        const dist = getTouchDistance(t1, t2);
+        const center = getTouchCenter(t1, t2);
+        
+        if (lastDist > 0 && lastCenter) {
+          const factor = dist / lastDist;
+          
+          // Apply pinch zoom relative to touch center
+          this.zoomStage(factor, center);
+
+          // Additionally pan based on touch center movement
+          const dx = center.x - lastCenter.x;
+          const dy = center.y - lastCenter.y;
+          this.stage.position({
+            x: this.stage.x() + dx,
+            y: this.stage.y() + dy
+          });
+          this.stage.batchDraw();
+        }
+
+        lastDist = dist;
+        lastCenter = center;
+      }
+    });
+
+    this.stage.on('touchend', (e) => {
+      if (e.evt.touches && e.evt.touches.length < 2) {
+        lastDist = 0;
+        lastCenter = null;
+      }
+    });
+  }
   }
 
   // --- Layer Management Methods ---

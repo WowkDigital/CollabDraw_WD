@@ -6,6 +6,7 @@ export class UIManager {
     // UI Elements cache
     this.brushBtn = document.getElementById('tool-brush');
     this.eraserBtn = document.getElementById('tool-eraser');
+    this.panBtn = document.getElementById('tool-pan');
     this.clearBtn = document.getElementById('tool-clear');
     this.sizeSlider = document.getElementById('brush-size');
     this.sizeDisplay = document.getElementById('brush-size-display');
@@ -15,6 +16,11 @@ export class UIManager {
     this.layerPanelClose = document.getElementById('layer-panel-close');
     this.layerAddBtn = document.getElementById('layer-add');
     this.layersListContainer = document.getElementById('layers-list-container');
+    
+    // Zoom Panel Elements
+    this.zoomInBtn = document.getElementById('zoom-in');
+    this.zoomOutBtn = document.getElementById('zoom-out');
+    this.zoomResetBtn = document.getElementById('zoom-reset');
     
     // Status Elements
     this.connIndicator = document.getElementById('connection-indicator');
@@ -120,6 +126,12 @@ export class UIManager {
     // Select tool
     this.brushBtn.addEventListener('click', () => this.setTool('brush'));
     this.eraserBtn.addEventListener('click', () => this.setTool('eraser'));
+    this.panBtn.addEventListener('click', () => this.setTool('pan'));
+
+    // Zoom Buttons
+    this.zoomInBtn.addEventListener('click', () => this.canvas.zoomStage(1.2));
+    this.zoomOutBtn.addEventListener('click', () => this.canvas.zoomStage(1 / 1.2));
+    this.zoomResetBtn.addEventListener('click', () => this.canvas.resetZoom());
     
     // Clear Active Layer
     this.clearBtn.addEventListener('click', () => {
@@ -164,19 +176,25 @@ export class UIManager {
 
   setTool(tool) {
     this.currentTool = tool;
-    this.canvas.currentTool = tool;
+    this.canvas.setTool(tool);
     
-    // Toggle active classes on tools UI
-    if (tool === 'brush') {
-      this.brushBtn.classList.add('bg-brand-600', 'text-white');
-      this.brushBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
-      this.eraserBtn.classList.remove('bg-brand-600', 'text-white');
-      this.eraserBtn.classList.add('text-slate-400', 'hover:bg-slate-800');
-    } else {
-      this.eraserBtn.classList.add('bg-brand-600', 'text-white');
-      this.eraserBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
-      this.brushBtn.classList.remove('bg-brand-600', 'text-white');
-      this.brushBtn.classList.add('text-slate-400', 'hover:bg-slate-800');
+    // Reset all tool button styles
+    [this.brushBtn, this.eraserBtn, this.panBtn].forEach(btn => {
+      if (btn) {
+        btn.classList.remove('bg-brand-600', 'text-white');
+        btn.classList.add('text-slate-400', 'hover:bg-slate-800');
+      }
+    });
+
+    // Apply active styles to the selected tool button
+    let activeBtn;
+    if (tool === 'brush') activeBtn = this.brushBtn;
+    else if (tool === 'eraser') activeBtn = this.eraserBtn;
+    else if (tool === 'pan') activeBtn = this.panBtn;
+
+    if (activeBtn) {
+      activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
+      activeBtn.classList.add('bg-brand-600', 'text-white');
     }
   }
 
@@ -283,11 +301,15 @@ export class UIManager {
     peers.forEach((peer) => {
       if (!peer.cursor) return;
 
+      // Project normalized coordinates back to screen positions based on stage zoom/pan
+      const stageTransform = this.canvas.stage.getAbsoluteTransform();
+      const screenPos = stageTransform.point({ x: peer.cursor.x, y: peer.cursor.y });
+ 
       const cursorDiv = document.createElement('div');
       cursorDiv.className = 'absolute flex flex-col items-start transition-all duration-75 pointer-events-none';
       cursorDiv.style.left = '0px';
       cursorDiv.style.top = '0px';
-      cursorDiv.style.transform = `translate3d(${peer.cursor.x}px, ${peer.cursor.y}px, 0)`;
+      cursorDiv.style.transform = `translate3d(${screenPos.x}px, ${screenPos.y}px, 0)`;
 
       // Cursor arrow SVG
       const cursorSvg = document.createElement('div');
