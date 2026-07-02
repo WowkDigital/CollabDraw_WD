@@ -48,9 +48,15 @@ export class SyncManager {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const signalingUrl = `${protocol}//${window.location.host}`;
 
+    // Use local signaling server when running on localhost, otherwise fallback to public servers
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const signalingServers = isLocalhost
+      ? [signalingUrl, 'wss://signaling.yjs.dev']
+      : ['wss://signaling.yjs.dev', 'wss://y-webrtc-signaling-eu.herokuapp.com', 'wss://y-webrtc-signaling-us.herokuapp.com'];
+
     // Establish WebRTC connection via signaling server
     this.provider = new WebrtcProvider(roomName, this.doc, {
-      signaling: [signalingUrl],
+      signaling: signalingServers,
       password: null
     });
 

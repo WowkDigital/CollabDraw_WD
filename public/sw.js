@@ -2,15 +2,15 @@ const CACHE_NAME = 'codraw-cache-v1';
 
 // Static resources to cache immediately on install
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/js/app.js',
-  '/js/canvas.js',
-  '/js/sync.js',
-  '/js/ui.js',
-  '/icon-192.png',
-  '/icon-512.png'
+  './',
+  'index.html',
+  'manifest.json',
+  'js/app.js',
+  'js/canvas.js',
+  'js/sync.js',
+  'js/ui.js',
+  'icon-192.png',
+  'icon-512.png'
 ];
 
 // Install Event - Pre-cache critical app shell
@@ -90,7 +90,7 @@ self.addEventListener('fetch', (event) => {
       }).catch((err) => {
         // Offline and not in cache
         if (request.headers.get('accept').includes('text/html')) {
-          return caches.match('/index.html');
+          return caches.match('index.html');
         }
         return new Response('Network error occurred', {
           status: 488,

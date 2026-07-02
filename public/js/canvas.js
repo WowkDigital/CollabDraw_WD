@@ -336,7 +336,6 @@ export class CanvasManager {
       }
     });
   }
-  }
 
   // --- Layer Management Methods ---
 
