@@ -1,5 +1,43 @@
 import * as Y from 'yjs';
 import { WebrtcProvider } from 'y-webrtc';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+
+// Firebase configuration. Replace with your own project config from Firebase Console.
+// Make sure to enable "Realtime Database" in your Firebase project.
+const firebaseConfig = {
+  apiKey: "AIzaSyDUHntH_CS-Pz0r0Hb5awrpt4XPozD1mBQ",
+  authDomain: "collabdraw-707ba.firebaseapp.com",
+  databaseURL: "https://collabdraw-707ba-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "collabdraw-707ba",
+  storageBucket: "collabdraw-707ba.firebasestorage.app",
+  messagingSenderId: "422285006399",
+  appId: "1:422285006399:web:8e77e277dd5751db080a8a",
+  measurementId: "G-WKP5SZF017"
+};
+
+const isFirebaseConfigured = firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
+
+// Helper functions for safe Base64 conversion to avoid Call Stack Size limits
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
 
 export class SyncManager {
   constructor() {
@@ -23,6 +61,11 @@ export class SyncManager {
     // Keep track of shapes we are listening to for points changes
     // shapeId -> Y.Array observer function
     this.shapeObservers = new Map();
+
+    // Firebase state
+    this.firebaseDb = null;
+    this.lastSavedState = null;
+    this.saveTimeout = null;
   }
 
   // Generate a premium random color for user cursors and avatars
@@ -41,20 +84,52 @@ export class SyncManager {
   }
 
   // Initialize room connection
-  init(roomName, username) {
+  async init(roomName, username) {
     this.roomName = roomName;
     this.username = username || `Artist_${Math.floor(Math.random() * 1000)}`;
 
+    // 1. Initial snapshot load from Firebase (if configured)
+    if (isFirebaseConfigured) {
+      try {
+        console.log(`[Firebase] Fetching snapshot for room: ${roomName}...`);
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        this.firebaseDb = db;
+        
+        const snapshotRef = ref(db, `rooms/${roomName}/snapshot`);
+        const snapshot = await get(snapshotRef);
+        
+        if (snapshot.exists()) {
+          const base64 = snapshot.val();
+          const bytes = base64ToArrayBuffer(base64);
+          Y.applyUpdate(this.doc, bytes, 'firebase-initial');
+          console.log(`[Firebase] Snapshot loaded and applied successfully.`);
+        } else {
+          console.log(`[Firebase] No snapshot found for room: ${roomName}. Starting fresh.`);
+        }
+        
+        // Setup automatic throttled saving of local changes to Firebase
+        this.setupFirebasePersistence();
+      } catch (err) {
+        console.error(`[Firebase] Failed to initialize or load snapshot:`, err);
+      }
+    } else {
+      console.warn(`[Firebase] NOT CONFIGURED. Real-time collaboration will work via WebRTC, but canvas state won't be maintained when everyone leaves. Set your config in public/js/sync.js.`);
+    }
+
+    // 2. Establish WebRTC connection via signaling server
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const signalingUrl = `${protocol}//${window.location.host}`;
 
-    // Use local signaling server when running on localhost, otherwise fallback to public servers
+    // Use local signaling server when running on localhost, otherwise fallback to public/custom servers
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const signalingServers = isLocalhost
       ? [signalingUrl, 'wss://signaling.yjs.dev']
-      : ['wss://signaling.yjs.dev', 'wss://y-webrtc-signaling-eu.herokuapp.com', 'wss://y-webrtc-signaling-us.herokuapp.com'];
+      : [
+          'wss://drawing-backend.onrender.com', // custom signaling on Render
+          'wss://signaling.yjs.dev'
+        ];
 
-    // Establish WebRTC connection via signaling server
     this.provider = new WebrtcProvider(roomName, this.doc, {
       signaling: signalingServers,
       password: null
@@ -68,6 +143,45 @@ export class SyncManager {
 
     // Setup observers
     this.setupObservers();
+
+    // If Firebase isn't used or we started a fresh room, wait a short moment for WebRTC peers to sync
+    if (this.yLayers.size === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+  }
+
+  // Setup periodic saving to Firebase Realtime Database
+  setupFirebasePersistence() {
+    this.doc.on('update', (update, origin) => {
+      // Don't save back changes that came from the initial load
+      if (origin === 'firebase-initial') return;
+
+      // Throttle saving: save at most once every 10 seconds of active changes
+      if (!this.saveTimeout) {
+        this.saveTimeout = setTimeout(() => {
+          this.saveSnapshotToFirebase();
+          this.saveTimeout = null;
+        }, 10000);
+      }
+    });
+  }
+
+  async saveSnapshotToFirebase() {
+    if (!this.firebaseDb || !this.roomName) return;
+
+    try {
+      const state = Y.encodeStateAsUpdate(this.doc);
+      const base64 = arrayBufferToBase64(state);
+
+      if (base64 === this.lastSavedState) return;
+
+      const snapshotRef = ref(this.firebaseDb, `rooms/${this.roomName}/snapshot`);
+      await set(snapshotRef, base64);
+      this.lastSavedState = base64;
+      console.log(`[Firebase] Room snapshot saved successfully for: ${this.roomName}`);
+    } catch (err) {
+      console.error(`[Firebase] Failed to save snapshot:`, err);
+    }
   }
 
   setupObservers() {

@@ -61,7 +61,7 @@ export class UIManager {
     this.roomInput.value = savedRoom;
     this.usernameInput.value = savedName;
 
-    const joinRoom = () => {
+    const joinRoom = async () => {
       const room = this.roomInput.value.trim().toLowerCase();
       const username = this.usernameInput.value.trim();
 
@@ -82,42 +82,40 @@ export class UIManager {
       this.roomModal.classList.add('opacity-0');
       setTimeout(() => this.roomModal.classList.add('hidden'), 300);
 
-      // Start Sync connection
-      this.sync.init(room, username);
+      // Start Sync connection and wait for initial snapshot
+      await this.sync.init(room, username);
 
       // Setup connections between canvas mutations and Yjs
       this.bindSyncAndCanvas();
 
       // Check if there are pre-existing layers in Yjs, if not, create a default layer
-      setTimeout(() => {
-        this.sync.observeInitialLayers();
-        
-        if (this.sync.yLayers.size === 0) {
-          const defaultLayerId = `layer_${Date.now()}`;
-          this.canvas.addLayer(defaultLayerId, 'Base Canvas Layer', true);
-          this.sync.addLayer(defaultLayerId, 'Base Canvas Layer', true);
-          this.canvas.setActiveLayer(defaultLayerId);
-        } else {
-          // Add existing remote layers locally
-          const order = this.sync.yLayerOrder.toArray();
-          order.forEach((layerId) => {
-            const yLayer = this.sync.yLayers.get(layerId);
-            if (yLayer) {
-              const data = yLayer.toJSON();
-              this.canvas.addLayer(layerId, data.name, data.visible);
-              this.canvas.reconcileRemoteLayerShapes(layerId, data.shapes);
-            }
-          });
-          this.canvas.reorderLayers(order);
-          if (order.length > 0) {
-            this.canvas.setActiveLayer(order[order.length - 1]); // Set top layer active
+      this.sync.observeInitialLayers();
+      
+      if (this.sync.yLayers.size === 0) {
+        const defaultLayerId = `layer_${Date.now()}`;
+        this.canvas.addLayer(defaultLayerId, 'Base Canvas Layer', true);
+        this.sync.addLayer(defaultLayerId, 'Base Canvas Layer', true);
+        this.canvas.setActiveLayer(defaultLayerId);
+      } else {
+        // Add existing remote layers locally
+        const order = this.sync.yLayerOrder.toArray();
+        order.forEach((layerId) => {
+          const yLayer = this.sync.yLayers.get(layerId);
+          if (yLayer) {
+            const data = yLayer.toJSON();
+            this.canvas.addLayer(layerId, data.name, data.visible);
+            this.canvas.reconcileRemoteLayerShapes(layerId, data.shapes);
           }
+        });
+        this.canvas.reorderLayers(order);
+        if (order.length > 0) {
+          this.canvas.setActiveLayer(order[order.length - 1]); // Set top layer active
         }
-        
-        // Update connection status
-        this.updateConnectionStatus(true);
-        this.renderLayersList();
-      }, 800); // Small delay to sync document state
+      }
+      
+      // Update connection status
+      this.updateConnectionStatus(true);
+      this.renderLayersList();
     };
 
     this.joinBtn.addEventListener('click', joinRoom);
