@@ -74,6 +74,20 @@
 
   <!-- Konva.js drawing framework -->
   <script src="https://cdn.jsdelivr.net/npm/konva@9.3.15/konva.min.js"></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Import map for resolving Yjs and WebRTC duplicate instances -->
+  <script type="importmap">
+    {
+      "imports": {
+        "yjs": "https://esm.sh/yjs@13.6.8",
+        "y-webrtc": "https://esm.sh/y-webrtc@10.2.5?external=yjs"
+      }
+    }
+  </script>
+
   <!-- Application Entry Point -->
   <script type="module" src="/js/app.js"></script>
 </head>
@@ -116,15 +130,15 @@
     <div class="flex items-center gap-1 border-r border-slate-800 pr-3">
       <!-- Brush Tool -->
       <button id="tool-brush" class="p-2.5 rounded-xl transition-all duration-200 bg-brand-600 text-white shadow-lg shadow-brand-500/20" title="Brush Tool">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M7.5 10.5c.83-.83 2.17-.83 3 0s.83 2.17 0 3l-3 3-2.5.5.5-2.5z"/><path d="m11.5 7.5 5 5"/></svg>
+        <i data-lucide="brush" class="w-5 h-5"></i>
       </button>
       <!-- Eraser Tool -->
       <button id="tool-eraser" class="p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Eraser Tool">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m20 20-6.056-6.056a2.003 2.003 0 0 0-2.828 0L3.896 21.16a1 1 0 0 0 .707 1.707H20Z"/><path d="m17.5 17.5-6.5-6.5L16.207 5.793a1 1 0 0 1 1.414 0L21.5 9.5a1 1 0 0 1 0 1.414L17.5 14.914Z"/><path d="M2 17h20"/></svg>
+        <i data-lucide="eraser" class="w-5 h-5"></i>
       </button>
       <!-- Clear Canvas -->
       <button id="tool-clear" class="p-2.5 rounded-xl transition-all duration-200 text-rose-400 hover:bg-rose-500/10" title="Clear Active Layer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+        <i data-lucide="trash-2" class="w-5 h-5"></i>
       </button>
     </div>
 
@@ -153,7 +167,7 @@
 
   <!-- 5. Floating Side Layer Manager Toggle -->
   <button id="layer-manager-toggle" class="absolute top-20 right-4 z-20 p-3 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl text-slate-300 hover:text-slate-100 hover:border-slate-700 transition-all duration-300 pointer-events-auto" title="Layers Panel">
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+    <i data-lucide="layers" class="w-5 h-5"></i>
   </button>
 
   <!-- 6. Layer Manager Drawer Panel (Slides in from the right) -->
@@ -161,18 +175,18 @@
     <!-- Panel Header -->
     <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
       <div class="flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brand-500"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+        <i data-lucide="layers" class="w-4.5 h-4.5 text-brand-500"></i>
         <h2 class="font-semibold text-sm tracking-wide">Layer Manager</h2>
       </div>
       <button id="layer-panel-close" class="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        <i data-lucide="x" class="w-4.5 h-4.5"></i>
       </button>
     </div>
 
     <!-- Add Layer Button -->
     <div class="p-4 border-b border-slate-800/50">
       <button id="layer-add" class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium text-xs shadow-lg shadow-brand-500/10 hover:shadow-brand-500/20 active:scale-95 transition-all duration-200">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+        <i data-lucide="plus" class="w-4 h-4"></i>
         New Drawing Layer
       </button>
     </div>

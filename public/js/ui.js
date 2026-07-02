@@ -37,6 +37,9 @@ export class UIManager {
     this.setupToolbar();
     this.setupLayerPanel();
     this.setupOfflineHandlers();
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
   }
 
   // 1. Initial Room Join Modal setup
@@ -81,6 +84,7 @@ export class UIManager {
         
         if (this.sync.yLayers.size === 0) {
           const defaultLayerId = `layer_${Date.now()}`;
+          this.canvas.addLayer(defaultLayerId, 'Base Canvas Layer', true);
           this.sync.addLayer(defaultLayerId, 'Base Canvas Layer', true);
           this.canvas.setActiveLayer(defaultLayerId);
         } else {
@@ -383,11 +387,11 @@ export class UIManager {
 
       // Move Up (higher index, overlaying on top)
       const upBtn = document.createElement('button');
-      upBtn.className = 'p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded';
+      upBtn.className = 'p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded flex items-center justify-center';
       upBtn.disabled = idx === 0;
       upBtn.style.opacity = idx === 0 ? '0.3' : '1';
       upBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
       `;
       upBtn.addEventListener('click', () => {
         const order = this.sync.yLayerOrder.toArray();
@@ -408,11 +412,11 @@ export class UIManager {
 
       // Move Down (lower index, below underneath)
       const downBtn = document.createElement('button');
-      downBtn.className = 'p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded';
+      downBtn.className = 'p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded flex items-center justify-center';
       downBtn.disabled = idx === layerIds.length - 1;
       downBtn.style.opacity = idx === layerIds.length - 1 ? '0.3' : '1';
       downBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
       `;
       downBtn.addEventListener('click', () => {
         const order = this.sync.yLayerOrder.toArray();
@@ -430,10 +434,10 @@ export class UIManager {
 
       // Eye visibility toggle
       const visBtn = document.createElement('button');
-      visBtn.className = `p-1 hover:bg-slate-800 rounded ${layerData.visible ? 'text-slate-300' : 'text-slate-500'}`;
+      visBtn.className = `p-1 hover:bg-slate-800 rounded flex items-center justify-center ${layerData.visible ? 'text-slate-300' : 'text-slate-500'}`;
       visBtn.innerHTML = layerData.visible
-        ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`
-        : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>`;
+        ? `<i data-lucide="eye" class="w-3.5 h-3.5"></i>`
+        : `<i data-lucide="eye-off" class="w-3.5 h-3.5"></i>`;
       
       visBtn.addEventListener('click', () => {
         const nextVisible = !layerData.visible;
@@ -444,9 +448,9 @@ export class UIManager {
 
       // Trash delete
       const delBtn = document.createElement('button');
-      delBtn.className = 'p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded';
+      delBtn.className = 'p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded flex items-center justify-center';
       delBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
       `;
       delBtn.addEventListener('click', () => {
         if (this.sync.yLayerOrder.length <= 1) {
@@ -469,6 +473,11 @@ export class UIManager {
       item.appendChild(actionsContainer);
       this.layersListContainer.appendChild(item);
     });
+
+    // Refresh dynamic Lucide icons inside the layers list
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
   }
 
   // 7. Connectivity display utilities

@@ -1,5 +1,5 @@
-import * as Y from 'https://esm.sh/yjs@13.6.8';
-import { WebrtcProvider } from 'https://esm.sh/y-webrtc@10.2.5';
+import * as Y from 'yjs';
+import { WebrtcProvider } from 'y-webrtc';
 
 export class SyncManager {
   constructor() {
