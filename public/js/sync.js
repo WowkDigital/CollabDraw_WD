@@ -1,7 +1,11 @@
 import * as Y from 'yjs';
 import { WebrtcProvider } from 'y-webrtc';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+
+// --- DIAGNOSTICS MODE ---
+// Set to true to enable console connection reports, write/read tests and payload logs.
+const firebaseDebugMode = true;
 
 // Firebase configuration. Replace with your own project config from Firebase Console.
 // Make sure to enable "Realtime Database" in your Firebase project.
@@ -46,11 +50,11 @@ export class SyncManager {
     this.roomName = '';
     this.username = '';
     this.color = this.getRandomColor();
-    
+
     // Shared state references
     this.yLayers = this.doc.getMap('layers');
     this.yLayerOrder = this.doc.getArray('layerOrder');
-    
+
     // Callback hooks for the application UI/Canvas to respond to remote changes
     this.onRemoteLayerChange = null; // (type, layerId, layerData)
     this.onRemoteLayerOrderChange = null; // (layerOrderArray)
@@ -95,10 +99,10 @@ export class SyncManager {
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         this.firebaseDb = db;
-        
+
         const snapshotRef = ref(db, `rooms/${roomName}/snapshot`);
         const snapshot = await get(snapshotRef);
-        
+
         if (snapshot.exists()) {
           const base64 = snapshot.val();
           const bytes = base64ToArrayBuffer(base64);
@@ -107,7 +111,7 @@ export class SyncManager {
         } else {
           console.log(`[Firebase] No snapshot found for room: ${roomName}. Starting fresh.`);
         }
-        
+
         // Setup automatic throttled saving of local changes to Firebase
         this.setupFirebasePersistence();
       } catch (err) {
@@ -126,9 +130,9 @@ export class SyncManager {
     const signalingServers = isLocalhost
       ? [signalingUrl, 'wss://signaling.yjs.dev']
       : [
-          'wss://drawing-backend.onrender.com', // custom signaling on Render
-          'wss://signaling.yjs.dev'
-        ];
+        'wss://drawing-backend.onrender.com', // custom signaling on Render
+        'wss://signaling.yjs.dev'
+      ];
 
     this.provider = new WebrtcProvider(roomName, this.doc, {
       signaling: signalingServers,
@@ -188,7 +192,7 @@ export class SyncManager {
     // 1. Observe changes in the list of layers
     this.yLayers.observeDeep((events, transaction) => {
       if (transaction.local) return; // Prevent loop: ignore local actions
-      
+
       events.forEach((event) => {
         // Handle changes in individual layers properties or shapes
         if (event.target === this.yLayers) {
@@ -277,7 +281,7 @@ export class SyncManager {
   observeInitialLayers() {
     this.yLayers.forEach((layerMap, layerId) => {
       this.observeShapesArray(layerId, layerMap.get('shapes'));
-      
+
       const shapesArray = layerMap.get('shapes');
       shapesArray.forEach((shapeMap) => {
         const shapeId = shapeMap.get('id');
@@ -339,7 +343,7 @@ export class SyncManager {
       }
 
       this.yLayers.delete(layerId);
-      
+
       // Remove from layer order list
       let index = -1;
       for (let i = 0; i < this.yLayerOrder.length; i++) {
@@ -371,20 +375,20 @@ export class SyncManager {
   // Initialize a new drawing stroke in the Yjs document
   startShape(layerId, shapeId, tool, color, strokeWidth) {
     let activeShapeMap = null;
-    
+
     this.doc.transact(() => {
       const layerMap = this.yLayers.get(layerId);
       if (!layerMap) return;
 
       const shapesArray = layerMap.get('shapes');
       const shapeMap = new Y.Map();
-      
+
       shapeMap.set('id', shapeId);
       shapeMap.set('type', 'line');
       shapeMap.set('color', color);
       shapeMap.set('strokeWidth', strokeWidth);
       shapeMap.set('globalCompositeOperation', tool === 'eraser' ? 'destination-out' : 'source-over');
-      
+
       const pointsArray = new Y.Array();
       shapeMap.set('points', pointsArray);
 
