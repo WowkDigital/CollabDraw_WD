@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CoDraw - Collaborative Canvas</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/png" href="/icon-192.png">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    /* Hide scrollbars */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    /* Custom slider styles */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      background: #334155;
+      height: 6px;
+      border-radius: 9999px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -5px;
+      background-color: #6366f1;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+      transition: transform 0.1s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+  </style>
+
+  <!-- Konva.js drawing framework -->
+  <script src="https://cdn.jsdelivr.net/npm/konva@9.3.15/konva.min.js"></script>
+  <!-- Application Entry Point -->
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 w-screen h-screen flex flex-col relative select-none">
+
+  <!-- 1. Header & Status Bar -->
+  <header class="absolute top-4 left-4 right-4 z-20 flex justify-between items-center pointer-events-none">
+    <!-- App Logo & Room Title -->
+    <div class="flex items-center gap-3 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-4 py-2 rounded-2xl shadow-xl pointer-events-auto transition-all duration-300 hover:border-slate-700">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-emerald-500 flex items-center justify-center font-bold text-white shadow-md shadow-brand-500/20">
+        C
+      </div>
+      <div>
+        <h1 class="text-sm font-semibold tracking-wide">CoDraw Canvas</h1>
+        <div class="flex items-center gap-1.5 text-slate-400 text-[10px]">
+          <span id="connection-indicator" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span id="connection-status">Connecting...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Collaborators List -->
+    <div id="collaborators-container" class="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-2xl shadow-xl pointer-events-auto max-w-xs md:max-w-md overflow-hidden">
+      <div class="flex -space-x-2 overflow-hidden" id="collaborator-avatars">
+        <!-- Avatars injected dynamically -->
+      </div>
+      <span id="collaborator-count" class="text-xs text-slate-400 ml-1.5 whitespace-nowrap">1 active</span>
+    </div>
+  </header>
+
+  <!-- 2. Drawing Area Container -->
+  <main id="canvas-container" class="w-full h-full flex-grow relative bg-[#0f172a] overflow-hidden touch-none"></main>
+
+  <!-- 3. Remote Cursor Overlay -->
+  <div id="cursors-overlay" class="absolute inset-0 pointer-events-none z-30"></div>
+
+  <!-- 4. Floating Main Toolbar -->
+  <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4 bg-slate-900/80 backdrop-blur-md border border-slate-800 p-3 rounded-2xl shadow-2xl transition-all duration-300 hover:border-slate-700 max-w-[95%]">
+    <!-- Active Tools -->
+    <div class="flex items-center gap-1 border-r border-slate-800 pr-3">
+      <!-- Brush Tool -->
+      <button id="tool-brush" class="p-2.5 rounded-xl transition-all duration-200 bg-brand-600 text-white shadow-lg shadow-brand-500/20" title="Brush Tool">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M7.5 10.5c.83-.83 2.17-.83 3 0s.83 2.17 0 3l-3 3-2.5.5.5-2.5z"/><path d="m11.5 7.5 5 5"/></svg>
+      </button>
+      <!-- Eraser Tool -->
+      <button id="tool-eraser" class="p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Eraser Tool">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m20 20-6.056-6.056a2.003 2.003 0 0 0-2.828 0L3.896 21.16a1 1 0 0 0 .707 1.707H20Z"/><path d="m17.5 17.5-6.5-6.5L16.207 5.793a1 1 0 0 1 1.414 0L21.5 9.5a1 1 0 0 1 0 1.414L17.5 14.914Z"/><path d="M2 17h20"/></svg>
+      </button>
+      <!-- Clear Canvas -->
+      <button id="tool-clear" class="p-2.5 rounded-xl transition-all duration-200 text-rose-400 hover:bg-rose-500/10" title="Clear Active Layer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+      </button>
+    </div>
+
+    <!-- Palette Colors -->
+    <div class="flex items-center gap-2 border-r border-slate-800 pr-3 overflow-x-auto">
+      <button class="color-picker-btn w-6 h-6 rounded-full border-2 border-white ring-2 ring-transparent transition-transform hover:scale-110" style="background-color: #6366f1;" data-color="#6366f1"></button>
+      <button class="color-picker-btn w-6 h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110" style="background-color: #ec4899;" data-color="#ec4899"></button>
+      <button class="color-picker-btn w-6 h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110" style="background-color: #ef4444;" data-color="#ef4444"></button>
+      <button class="color-picker-btn w-6 h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110" style="background-color: #f59e0b;" data-color="#f59e0b"></button>
+      <button class="color-picker-btn w-6 h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110" style="background-color: #10b981;" data-color="#10b981"></button>
+      <button class="color-picker-btn w-6 h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110" style="background-color: #06b6d4;" data-color="#06b6d4"></button>
+      <button class="color-picker-btn w-6 h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110" style="background-color: #f8fafc;" data-color="#f8fafc"></button>
+      <!-- Custom Color Picker Input -->
+      <div class="relative w-6 h-6 rounded-full overflow-hidden border border-slate-700 hover:scale-110 transition-transform">
+        <input type="color" id="color-custom" class="absolute -inset-1 cursor-pointer w-8 h-8 p-0 border-0 bg-transparent" value="#6366f1">
+      </div>
+    </div>
+
+    <!-- Brush Size Slider -->
+    <div class="flex items-center gap-3 w-28 md:w-36">
+      <span class="text-xs text-slate-400 select-none">Size</span>
+      <input type="range" id="brush-size" min="2" max="50" value="8" class="w-full">
+      <span id="brush-size-display" class="text-xs font-semibold text-slate-300 w-4 text-right">8</span>
+    </div>
+  </div>
+
+  <!-- 5. Floating Side Layer Manager Toggle -->
+  <button id="layer-manager-toggle" class="absolute top-20 right-4 z-20 p-3 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl text-slate-300 hover:text-slate-100 hover:border-slate-700 transition-all duration-300 pointer-events-auto" title="Layers Panel">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+  </button>
+
+  <!-- 6. Layer Manager Drawer Panel (Slides in from the right) -->
+  <aside id="layer-panel" class="absolute top-0 right-0 bottom-0 w-80 bg-slate-900/95 backdrop-blur-md border-l border-slate-800/80 shadow-2xl z-40 transform translate-x-full transition-transform duration-300 flex flex-col">
+    <!-- Panel Header -->
+    <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+      <div class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brand-500"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+        <h2 class="font-semibold text-sm tracking-wide">Layer Manager</h2>
+      </div>
+      <button id="layer-panel-close" class="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Add Layer Button -->
+    <div class="p-4 border-b border-slate-800/50">
+      <button id="layer-add" class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium text-xs shadow-lg shadow-brand-500/10 hover:shadow-brand-500/20 active:scale-95 transition-all duration-200">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+        New Drawing Layer
+      </button>
+    </div>
+
+    <!-- Layers List -->
+    <div class="flex-grow overflow-y-auto p-4 space-y-2.5" id="layers-list-container">
+      <!-- Dynamic list elements will be added here -->
+    </div>
+
+    <!-- Panel Footer info -->
+    <div class="p-4 border-t border-slate-800/80 bg-slate-950/40 text-[10px] text-slate-500 flex justify-between items-center">
+      <span>Z-index managed dynamically</span>
+      <span>Double click layer to rename</span>
+    </div>
+  </aside>
+
+  <!-- 7. Connection Setup Modal (Fallback/Manual Entry Room Name) -->
+  <div id="room-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-lg flex items-center justify-center z-50 transition-opacity duration-300">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl mx-4">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-500 flex items-center justify-center font-bold text-white shadow-xl shadow-brand-500/25 mb-6 text-xl mx-auto">
+        C
+      </div>
+      <h2 class="text-xl font-bold text-center tracking-tight mb-2">Join Drawing Canvas</h2>
+      <p class="text-xs text-slate-400 text-center mb-6">Enter a room name to share a real-time collaborative workspace with others.</p>
+      
+      <div class="space-y-4">
+        <div>
+          <label for="room-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Room Name</label>
+          <input type="text" id="room-input" class="w-full py-3 px-4 bg-slate-950 border border-slate-800 rounded-xl focus:border-brand-500 focus:outline-none text-slate-100 text-sm font-medium transition-colors" placeholder="e.g., design-sync">
+        </div>
+        <div>
+          <label for="username-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Your Name</label>
+          <input type="text" id="username-input" class="w-full py-3 px-4 bg-slate-950 border border-slate-800 rounded-xl focus:border-brand-500 focus:outline-none text-slate-100 text-sm font-medium transition-colors" placeholder="e.g., Sarah">
+        </div>
+        <button id="room-join" class="w-full py-3 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white rounded-xl font-semibold text-sm transition-all shadow-xl shadow-brand-500/10">
+          Enter Room
+        </button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

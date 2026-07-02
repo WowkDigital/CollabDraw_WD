@@ -1,0 +1,16 @@
+{
+  "name": "collaborative-drawing-pwa",
+  "version": "1.0.0",
+  "description": "Progressive Web App for real-time collaborative drawing using Konva.js and Yjs",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "author": "Antigravity",
+  "license": "MIT"
+}

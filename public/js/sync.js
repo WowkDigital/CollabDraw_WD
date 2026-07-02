@@ -1,0 +1,313 @@
+import * as Y from 'https://esm.sh/yjs@13.6.8';
+import { WebrtcProvider } from 'https://esm.sh/y-webrtc@10.2.5';
+
+export class SyncManager {
+  constructor() {
+    this.doc = new Y.Doc();
+    this.provider = null;
+    this.roomName = '';
+    this.username = '';
+    this.color = this.getRandomColor();
+    
+    // Shared state references
+    this.yLayers = this.doc.getMap('layers');
+    this.yLayerOrder = this.doc.getArray('layerOrder');
+    
+    // Callback hooks for the application UI/Canvas to respond to remote changes
+    this.onRemoteLayerChange = null; // (type, layerId, layerData)
+    this.onRemoteLayerOrderChange = null; // (layerOrderArray)
+    this.onRemoteShapeChange = null; // (layerId, shapeId, shapeData, isDeleted)
+    this.onRemotePointsChange = null; // (layerId, shapeId, pointsArray)
+    this.onPeerCursorsChange = null; // (peers)
+
+    // Keep track of shapes we are listening to for points changes
+    // shapeId -> Y.Array observer function
+    this.shapeObservers = new Map();
+  }
+
+  // Generate a premium random color for user cursors and avatars
+  getRandomColor() {
+    const colors = [
+      '#6366f1', // Indigo
+      '#ec4899', // Pink
+      '#ef4444', // Red
+      '#f59e0b', // Amber
+      '#10b981', // Emerald
+      '#06b6d4', // Cyan
+      '#8b5cf6', // Violet
+      '#a855f7'  // Purple
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  // Initialize room connection
+  init(roomName, username) {
+    this.roomName = roomName;
+    this.username = username || `Artist_${Math.floor(Math.random() * 1000)}`;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const signalingUrl = `${protocol}//${window.location.host}`;
+
+    // Establish WebRTC connection via signaling server
+    this.provider = new WebrtcProvider(roomName, this.doc, {
+      signaling: [signalingUrl],
+      password: null
+    });
+
+    // Set local user state in WebRTC Awareness
+    this.provider.awareness.setLocalStateField('user', {
+      name: this.username,
+      color: this.color
+    });
+
+    // Setup observers
+    this.setupObservers();
+  }
+
+  setupObservers() {
+    // 1. Observe changes in the list of layers
+    this.yLayers.observeDeep((events, transaction) => {
+      if (transaction.local) return; // Prevent loop: ignore local actions
+      
+      events.forEach((event) => {
+        // Handle changes in individual layers properties or shapes
+        if (event.target === this.yLayers) {
+          // Layer added or removed
+          event.changes.keys.forEach((change, key) => {
+            if (change.action === 'add') {
+              const layerMap = this.yLayers.get(key);
+              if (this.onRemoteLayerChange) {
+                this.onRemoteLayerChange('add', key, layerMap.toJSON());
+              }
+              // Set observer for shape array in this new layer
+              this.observeShapesArray(key, layerMap.get('shapes'));
+            } else if (change.action === 'delete') {
+              if (this.onRemoteLayerChange) {
+                this.onRemoteLayerChange('delete', key, null);
+              }
+            }
+          });
+        } else if (event.target instanceof Y.Map && event.path.length === 1) {
+          // Layer properties updated (e.g., name, visible)
+          const layerId = event.path[0];
+          const layerMap = event.target;
+          if (this.onRemoteLayerChange) {
+            this.onRemoteLayerChange('update', layerId, layerMap.toJSON());
+          }
+        } else if (event.target instanceof Y.Array && event.path.length === 2 && event.path[1] === 'shapes') {
+          // Shapes array inside a layer changed
+          const layerId = event.path[0];
+          event.changes.delta.forEach((delta) => {
+            if (delta.insert) {
+              delta.insert.forEach((shapeMap) => {
+                const shapeId = shapeMap.get('id');
+                if (this.onRemoteShapeChange) {
+                  this.onRemoteShapeChange(layerId, shapeId, shapeMap.toJSON(), false);
+                }
+                this.observeShapePoints(layerId, shapeId, shapeMap.get('points'));
+              });
+            }
+            // Delete detection
+            // In Yjs arrays, delete contains number of elements deleted,
+            // we will reconcile layer state dynamically in canvas.js by diffing.
+            if (delta.delete) {
+              if (this.onRemoteShapeChange) {
+                // Trigger a full redraw sync for this layer to apply deletion
+                this.onRemoteShapeChange(layerId, null, null, true);
+              }
+            }
+          });
+        }
+      });
+    });
+
+    // 2. Observe changes in layers Z-index (ordering)
+    this.yLayerOrder.observe((event, transaction) => {
+      if (transaction.local) return;
+      if (this.onRemoteLayerOrderChange) {
+        this.onRemoteLayerOrderChange(this.yLayerOrder.toArray());
+      }
+    });
+
+    // 3. Observe active user changes (Awareness)
+    this.provider.awareness.on('change', () => {
+      const states = this.provider.awareness.getStates();
+      const peers = [];
+
+      states.forEach((state, clientID) => {
+        if (clientID === this.doc.clientID) return; // Skip self
+
+        if (state.user) {
+          peers.push({
+            id: clientID,
+            name: state.user.name,
+            color: state.user.color,
+            cursor: state.cursor || null
+          });
+        }
+      });
+
+      if (this.onPeerCursorsChange) {
+        this.onPeerCursorsChange(peers);
+      }
+    });
+  }
+
+  // Setup observers for shapes array inside pre-existing layers when doc finishes loading
+  observeInitialLayers() {
+    this.yLayers.forEach((layerMap, layerId) => {
+      this.observeShapesArray(layerId, layerMap.get('shapes'));
+      
+      const shapesArray = layerMap.get('shapes');
+      shapesArray.forEach((shapeMap) => {
+        const shapeId = shapeMap.get('id');
+        this.observeShapePoints(layerId, shapeId, shapeMap.get('points'));
+      });
+    });
+  }
+
+  observeShapesArray(layerId, shapesArray) {
+    // Already observed by observeDeep above, but keeps structure consistent
+  }
+
+  // Observe real-time growth of drawing lines
+  observeShapePoints(layerId, shapeId, pointsYArray) {
+    if (this.shapeObservers.has(shapeId)) {
+      // Remove old observer if already set
+      pointsYArray.unobserve(this.shapeObservers.get(shapeId));
+    }
+
+    const observer = (event, transaction) => {
+      if (transaction.local) return;
+      if (this.onRemotePointsChange) {
+        this.onRemotePointsChange(layerId, shapeId, pointsYArray.toArray());
+      }
+    };
+
+    pointsYArray.observe(observer);
+    this.shapeObservers.set(shapeId, observer);
+  }
+
+  cleanupShapeObserver(shapeId) {
+    this.shapeObservers.delete(shapeId);
+  }
+
+  // --- Transactional API for Canvas Mutations ---
+
+  addLayer(layerId, name, visible = true) {
+    this.doc.transact(() => {
+      const layerMap = new Y.Map();
+      layerMap.set('id', layerId);
+      layerMap.set('name', name);
+      layerMap.set('visible', visible);
+      layerMap.set('shapes', new Y.Array());
+
+      this.yLayers.set(layerId, layerMap);
+      this.yLayerOrder.push([layerId]);
+    });
+  }
+
+  deleteLayer(layerId) {
+    this.doc.transact(() => {
+      // Clean up local listeners
+      const layerMap = this.yLayers.get(layerId);
+      if (layerMap) {
+        const shapes = layerMap.get('shapes');
+        shapes.forEach((shapeMap) => {
+          this.cleanupShapeObserver(shapeMap.get('id'));
+        });
+      }
+
+      this.yLayers.delete(layerId);
+      
+      // Remove from layer order list
+      let index = -1;
+      for (let i = 0; i < this.yLayerOrder.length; i++) {
+        if (this.yLayerOrder.get(i) === layerId) {
+          index = i;
+          break;
+        }
+      }
+      if (index !== -1) {
+        this.yLayerOrder.delete(index, 1);
+      }
+    });
+  }
+
+  updateLayerProperty(layerId, key, value) {
+    const layerMap = this.yLayers.get(layerId);
+    if (layerMap) {
+      layerMap.set(key, value);
+    }
+  }
+
+  reorderLayers(newOrder) {
+    this.doc.transact(() => {
+      this.yLayerOrder.delete(0, this.yLayerOrder.length);
+      this.yLayerOrder.push(newOrder);
+    });
+  }
+
+  // Initialize a new drawing stroke in the Yjs document
+  startShape(layerId, shapeId, tool, color, strokeWidth) {
+    let activeShapeMap = null;
+    
+    this.doc.transact(() => {
+      const layerMap = this.yLayers.get(layerId);
+      if (!layerMap) return;
+
+      const shapesArray = layerMap.get('shapes');
+      const shapeMap = new Y.Map();
+      
+      shapeMap.set('id', shapeId);
+      shapeMap.set('type', 'line');
+      shapeMap.set('color', color);
+      shapeMap.set('strokeWidth', strokeWidth);
+      shapeMap.set('globalCompositeOperation', tool === 'eraser' ? 'destination-out' : 'source-over');
+      
+      const pointsArray = new Y.Array();
+      shapeMap.set('points', pointsArray);
+
+      shapesArray.push([shapeMap]);
+      activeShapeMap = shapeMap;
+    });
+
+    return activeShapeMap;
+  }
+
+  // Push new points coordinates continuously to the live shape
+  addPointsToShape(shapeMap, coordinates) {
+    const pointsArray = shapeMap.get('points');
+    if (pointsArray) {
+      pointsArray.push(coordinates);
+    }
+  }
+
+  clearLayerShapes(layerId) {
+    const layerMap = this.yLayers.get(layerId);
+    if (layerMap) {
+      const shapesArray = layerMap.get('shapes');
+      this.doc.transact(() => {
+        shapesArray.forEach((shapeMap) => {
+          this.cleanupShapeObserver(shapeMap.get('id'));
+        });
+        shapesArray.delete(0, shapesArray.length);
+      });
+    }
+  }
+
+  // Track user mouse cursor position
+  updateCursor(x, y) {
+    if (this.provider && this.provider.awareness) {
+      this.provider.awareness.setLocalStateField('cursor', { x, y });
+    }
+  }
+
+  destroy() {
+    if (this.provider) {
+      this.provider.destroy();
+    }
+    this.doc.destroy();
+    this.shapeObservers.clear();
+  }
+}

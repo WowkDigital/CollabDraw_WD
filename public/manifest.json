@@ -1,0 +1,22 @@
+{
+  "short_name": "CoDraw",
+  "name": "CoDraw - Real-time Collaborative Drawing App",
+  "description": "A progressive web app for real-time collaborative vector drawing using Konva.js and Yjs",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "display": "standalone",
+  "orientation": "portrait-primary"
+}
