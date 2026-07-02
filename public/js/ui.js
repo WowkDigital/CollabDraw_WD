@@ -16,6 +16,7 @@ export class UIManager {
     this.layerPanelClose = document.getElementById('layer-panel-close');
     this.layerAddBtn = document.getElementById('layer-add');
     this.layersListContainer = document.getElementById('layers-list-container');
+    this.shareBtn = document.getElementById('btn-share');
     
     // Zoom Panel Elements
     this.zoomInBtn = document.getElementById('zoom-in');
@@ -42,6 +43,7 @@ export class UIManager {
     this.setupModal();
     this.setupToolbar();
     this.setupLayerPanel();
+    this.setupShareButton();
     this.setupOfflineHandlers();
     if (window.lucide) {
       window.lucide.createIcons();
@@ -50,8 +52,10 @@ export class UIManager {
 
   // 1. Initial Room Join Modal setup
   setupModal() {
-    // Suggest standard values if inputs are empty
-    const savedRoom = localStorage.getItem('codraw_room') || 'creative-studio';
+    // Suggest standard values if inputs are empty, checking URL parameters first
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    const savedRoom = roomParam || localStorage.getItem('codraw_room') || 'creative-studio';
     const savedName = localStorage.getItem('codraw_name') || '';
 
     this.roomInput.value = savedRoom;
@@ -119,6 +123,57 @@ export class UIManager {
     this.joinBtn.addEventListener('click', joinRoom);
     this.roomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
     this.usernameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
+  }
+
+  // 1b. Share Room Link setup
+  setupShareButton() {
+    if (!this.shareBtn) return;
+
+    this.shareBtn.addEventListener('click', async () => {
+      if (!this.sync.roomName) {
+        alert('Dołącz najpierw do pokoju, aby móc go udostępnić.');
+        return;
+      }
+
+      // Generate the URL with room query parameter
+      const shareUrl = new URL(window.location.href);
+      shareUrl.searchParams.set('room', this.sync.roomName);
+      const urlString = shareUrl.toString();
+
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: 'Dołącz do wspólnego rysowania w CoDraw',
+            text: `Zapraszam do wspólnego rysowania w pokoju "${this.sync.roomName}"!`,
+            url: urlString
+          });
+        } else {
+          await navigator.clipboard.writeText(urlString);
+          
+          // Micro-interaction: Change button icon to checkmark for success feedback
+          const icon = this.shareBtn.querySelector('i');
+          const originalTitle = this.shareBtn.getAttribute('title');
+          
+          if (icon) {
+            icon.setAttribute('data-lucide', 'check');
+            if (window.lucide) window.lucide.createIcons();
+          }
+          this.shareBtn.classList.replace('text-slate-400', 'text-emerald-400');
+          this.shareBtn.setAttribute('title', 'Skopiowano link!');
+          
+          setTimeout(() => {
+            if (icon) {
+              icon.setAttribute('data-lucide', 'share-2');
+              if (window.lucide) window.lucide.createIcons();
+            }
+            this.shareBtn.classList.replace('text-emerald-400', 'text-slate-400');
+            this.shareBtn.setAttribute('title', originalTitle);
+          }, 2000);
+        }
+      } catch (err) {
+        console.error('Błąd udostępniania:', err);
+      }
+    });
   }
 
   // 2. Toolbar logic (brush, size, colors)
