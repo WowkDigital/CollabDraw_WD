@@ -135,6 +135,9 @@ export class CanvasManager {
   // 2. Local Touch and Mouse Interactions
   setupDrawingListeners() {
     this.stage.on('mousedown touchstart', (e) => {
+      // Prevent double firing on touch/mouse devices
+      if (this.isDrawing) return;
+
       // If we are in panning mode, ignore drawing start
       if (this.currentTool === 'pan') return;
 
