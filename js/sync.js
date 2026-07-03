@@ -285,7 +285,7 @@ export class SyncManager {
 
       this.yLayers.set(layerId, layerMap);
       this.yLayerOrder.push([layerId]);
-    });
+    }, 'canvas-edit');
   }
 
   deleteLayer(layerId) {
@@ -312,13 +312,15 @@ export class SyncManager {
       if (index !== -1) {
         this.yLayerOrder.delete(index, 1);
       }
-    });
+    }, 'canvas-edit');
   }
 
   updateLayerProperty(layerId, key, value) {
     const layerMap = this.yLayers.get(layerId);
     if (layerMap) {
-      layerMap.set(key, value);
+      this.doc.transact(() => {
+        layerMap.set(key, value);
+      }, 'canvas-edit');
     }
   }
 
@@ -326,7 +328,7 @@ export class SyncManager {
     this.doc.transact(() => {
       this.yLayerOrder.delete(0, this.yLayerOrder.length);
       this.yLayerOrder.push(newOrder);
-    });
+    }, 'canvas-edit');
   }
 
   // Initialize a new drawing stroke in the Yjs document
@@ -354,7 +356,7 @@ export class SyncManager {
 
       shapesArray.push([shapeMap]);
       activeShapeMap = shapeMap;
-    });
+    }, 'canvas-edit');
 
     return activeShapeMap;
   }
@@ -401,7 +403,7 @@ export class SyncManager {
           this.cleanupShapeObserver(shapeMap.get('id'));
         });
         shapesArray.delete(0, shapesArray.length);
-      });
+      }, 'canvas-edit');
     }
   }
 
