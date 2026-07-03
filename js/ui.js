@@ -10,6 +10,12 @@ export class UIManager {
     this.clearBtn = document.getElementById('tool-clear');
     this.sizeSlider = document.getElementById('brush-size');
     this.sizeDisplay = document.getElementById('brush-size-display');
+    
+    // Brush Size Preview Elements
+    this.previewBubble = document.getElementById('brush-size-preview-bubble');
+    this.previewCircle = document.getElementById('brush-size-preview-circle');
+    this.previewText = document.getElementById('brush-size-preview-text');
+
     this.customColorInput = document.getElementById('color-custom');
     this.layerToggleBtn = document.getElementById('layer-manager-toggle');
     this.layerPanel = document.getElementById('layer-panel');
@@ -202,12 +208,47 @@ export class UIManager {
       }
     });
 
-    // Brush Size
+    // Brush Size & Preview Tooltip interactions
+    let hideTimeout;
+    const showBubble = () => {
+      if (hideTimeout) clearTimeout(hideTimeout);
+      if (this.previewBubble) {
+        this.previewBubble.classList.remove('hidden');
+        requestAnimationFrame(() => {
+          this.previewBubble.classList.remove('opacity-0');
+          this.previewBubble.classList.add('opacity-100');
+        });
+        this.updateSizePreview(this.sizeSlider.value);
+      }
+    };
+
+    const hideBubble = () => {
+      if (hideTimeout) clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => {
+        if (this.previewBubble) {
+          this.previewBubble.classList.remove('opacity-100');
+          this.previewBubble.classList.add('opacity-0');
+          setTimeout(() => {
+            if (this.previewBubble.classList.contains('opacity-0')) {
+              this.previewBubble.classList.add('hidden');
+            }
+          }, 200);
+        }
+      }, 800);
+    };
+
     this.sizeSlider.addEventListener('input', (e) => {
       const val = e.target.value;
       this.sizeDisplay.textContent = val;
       this.canvas.currentWidth = parseInt(val, 10);
+      showBubble();
     });
+
+    this.sizeSlider.addEventListener('pointerdown', showBubble);
+    this.sizeSlider.addEventListener('touchstart', showBubble);
+    this.sizeSlider.addEventListener('pointerup', hideBubble);
+    this.sizeSlider.addEventListener('pointercancel', hideBubble);
+    this.sizeSlider.addEventListener('touchend', hideBubble);
 
     // Preset Colors picker
     const colorPickers = document.querySelectorAll('.color-picker-btn');
@@ -255,11 +296,29 @@ export class UIManager {
       activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
       activeBtn.classList.add('bg-brand-600', 'text-white');
     }
+    this.updateSizePreview(this.sizeSlider.value);
   }
 
   setColor(color) {
     this.canvas.currentColor = color;
     this.customColorInput.value = color;
+    this.updateSizePreview(this.sizeSlider.value);
+  }
+
+  updateSizePreview(val) {
+    if (!this.previewBubble || !this.previewCircle || !this.previewText) return;
+    
+    this.previewText.textContent = `${val}px`;
+    this.previewCircle.style.width = `${val}px`;
+    this.previewCircle.style.height = `${val}px`;
+    
+    if (this.currentTool === 'eraser') {
+      this.previewCircle.style.backgroundColor = 'transparent';
+      this.previewCircle.style.border = '2px dashed #94a3b8';
+    } else {
+      this.previewCircle.style.backgroundColor = this.canvas.currentColor || '#6366f1';
+      this.previewCircle.style.border = 'none';
+    }
   }
 
   // 3. Layer manager Drawer UI toggle

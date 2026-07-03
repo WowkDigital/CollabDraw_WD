@@ -176,7 +176,15 @@
     </div>
 
     <!-- Brush Size Slider (Full width on mobile, inline on desktop) -->
-    <div class="flex items-center gap-3 w-full md:w-36 border-t border-slate-800/60 md:border-t-0 pt-2 md:pt-0">
+    <div class="relative flex items-center gap-3 w-full md:w-36 border-t border-slate-800/60 md:border-t-0 pt-2 md:pt-0">
+      <!-- Brush Size Preview Tooltip -->
+      <div id="brush-size-preview-bubble" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-2 shadow-2xl flex flex-col items-center justify-center gap-1 pointer-events-none transition-all duration-200 z-50 min-w-[64px]">
+        <div class="w-14 h-14 flex items-center justify-center bg-slate-950/40 rounded-lg border border-slate-800/50 overflow-hidden">
+          <div id="brush-size-preview-circle" class="rounded-full transition-all duration-75" style="width: 8px; height: 8px; background-color: #6366f1;"></div>
+        </div>
+        <span id="brush-size-preview-text" class="text-[10px] font-bold text-slate-300">8px</span>
+      </div>
+
       <span class="text-[10px] sm:text-xs text-slate-400 select-none uppercase tracking-wider font-semibold">Size</span>
       <input type="range" id="brush-size" min="2" max="50" value="8" class="w-full">
       <span id="brush-size-display" class="text-xs font-semibold text-slate-300 w-4 text-right">8</span>
