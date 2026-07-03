@@ -77,22 +77,17 @@ export class UIManager {
   // 1. Initial Room Join Modal setup
   setupModal() {
     // Suggest standard values if inputs are empty, checking URL parameters first
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomParam = urlParams.get('room');
-    const savedRoom = roomParam || localStorage.getItem('codraw_room') || 'creative-studio';
     const savedName = localStorage.getItem('codraw_name') || '';
 
-    this.roomInput.value = savedRoom;
+    this.roomInput.value = 'room 1';
+    this.roomInput.disabled = true;
+    this.roomInput.classList.add('opacity-60', 'cursor-not-allowed');
     this.usernameInput.value = savedName;
 
     const joinRoom = async () => {
-      const room = this.roomInput.value.trim().toLowerCase();
+      const room = 'room 1';
       const username = this.usernameInput.value.trim();
 
-      if (!room) {
-        alert('Please enter a room name');
-        return;
-      }
       if (!username) {
         alert('Please enter your name');
         return;
@@ -546,8 +541,27 @@ export class UIManager {
 
     // Add Layer
     this.layerAddBtn.addEventListener('click', () => {
-      const name = prompt('Enter name for the new layer:');
-      if (name) {
+      let name = prompt('Enter name for the new layer:');
+      if (name !== null) {
+        name = name.trim();
+        if (name === '') {
+          const existingNames = new Set();
+          this.sync.yLayerOrder.toArray().forEach(layerId => {
+            const yLayer = this.sync.yLayers.get(layerId);
+            if (yLayer) {
+              const data = yLayer.toJSON();
+              if (data && data.name) {
+                existingNames.add(data.name.trim().toLowerCase());
+              }
+            }
+          });
+          
+          let num = 2;
+          while (existingNames.has(`layer ${num}`)) {
+            num++;
+          }
+          name = `layer ${num}`;
+        }
         const id = `layer_${Date.now()}`;
         this.canvas.addLayer(id, name, true);
         this.sync.addLayer(id, name, true);

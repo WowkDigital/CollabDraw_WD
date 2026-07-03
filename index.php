@@ -139,12 +139,49 @@
   <!-- 3. Remote Cursor Overlay -->
   <div id="cursors-overlay" class="absolute inset-0 pointer-events-none z-30"></div>
 
-  <!-- 4. Floating Main Toolbar -->
-  <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col md:flex-row items-center gap-2.5 md:gap-4 bg-slate-900/80 backdrop-blur-md border border-slate-800 p-2.5 md:p-3 rounded-2xl md:rounded-3xl shadow-2xl max-w-[95%] w-[calc(100%-2rem)] md:w-auto transition-all duration-300 hover:border-slate-700">
-    <!-- Top Row on Mobile (Tools & Colors) -->
-    <div class="flex items-center justify-between w-full md:w-auto gap-2">
+  <!-- 4. Floating Main Toolbar Wrapper -->
+  <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2.5 max-w-[95%] w-[calc(100%-2rem)] md:w-auto pointer-events-none">
+    
+    <!-- Panel 1: Wybór kolorów i rozmiar pędzla -->
+    <div class="pointer-events-auto flex items-center gap-3 bg-slate-900/80 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-2xl w-full md:w-auto max-w-full overflow-x-auto no-scrollbar flex-nowrap shrink-0 transition-all duration-300 hover:border-slate-700">
+      <!-- Palette Colors -->
+      <div class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0">
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-white ring-2 ring-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #6366f1;" data-color="#6366f1"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #ec4899;" data-color="#ec4899"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #ef4444;" data-color="#ef4444"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #f59e0b;" data-color="#f59e0b"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #10b981;" data-color="#10b981"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #06b6d4;" data-color="#06b6d4"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #f8fafc;" data-color="#f8fafc"></button>
+        <!-- Custom Color Picker Input -->
+        <div class="relative w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-slate-700 hover:scale-110 transition-transform flex-shrink-0">
+          <input type="color" id="color-custom" class="absolute -inset-1 cursor-pointer w-8 h-8 p-0 border-0 bg-transparent" value="#6366f1">
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="h-6 w-[1px] bg-slate-800 shrink-0"></div>
+
+      <!-- Brush Size Slider -->
+      <div class="relative flex items-center gap-3 w-32 md:w-36 shrink-0">
+        <!-- Brush Size Preview Tooltip -->
+        <div id="brush-size-preview-bubble" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-2 shadow-2xl flex flex-col items-center justify-center gap-1 pointer-events-none transition-all duration-200 z-50 min-w-[64px]">
+          <div class="w-14 h-14 flex items-center justify-center bg-slate-950/40 rounded-lg border border-slate-800/50 overflow-hidden">
+            <div id="brush-size-preview-circle" class="rounded-full transition-all duration-75" style="width: 8px; height: 8px; background-color: #6366f1;"></div>
+          </div>
+          <span id="brush-size-preview-text" class="text-[10px] font-bold text-slate-300">8px</span>
+        </div>
+
+        <span class="text-[10px] sm:text-xs text-slate-400 select-none uppercase tracking-wider font-semibold">Size</span>
+        <input type="range" id="brush-size" min="2" max="50" value="8" class="w-full">
+        <span id="brush-size-display" class="text-xs font-semibold text-slate-300 w-4 text-right">8</span>
+      </div>
+    </div>
+
+    <!-- Panel 2: Narzędzia -->
+    <div class="pointer-events-auto flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-2xl w-full md:w-auto max-w-full overflow-x-auto no-scrollbar flex-nowrap shrink-0 transition-all duration-300 hover:border-slate-700">
       <!-- Active Tools -->
-      <div class="flex items-center gap-1 border-r border-slate-800 pr-2 md:pr-3">
+      <div class="flex items-center gap-1 flex-nowrap shrink-0">
         <!-- Brush Tool -->
         <button id="tool-brush" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 bg-brand-600 text-white shadow-lg shadow-brand-500/20" title="Brush Tool">
           <i data-lucide="brush" class="w-4 h-4 sm:w-5 sm:h-5"></i>
@@ -187,7 +224,7 @@
         </button>
 
         <!-- Divider -->
-        <div class="h-6 w-[1px] bg-slate-800 mx-1"></div>
+        <div class="h-6 w-[1px] bg-slate-800 mx-1 shrink-0"></div>
 
         <!-- Undo Tool -->
         <button id="btn-undo" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Cofnij (Ctrl+Z)">
@@ -200,7 +237,7 @@
         </button>
 
         <!-- Divider -->
-        <div class="h-6 w-[1px] bg-slate-800 mx-1"></div>
+        <div class="h-6 w-[1px] bg-slate-800 mx-1 shrink-0"></div>
 
         <!-- Pan Tool -->
         <button id="tool-pan" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Pan / Navigate Canvas">
@@ -211,36 +248,6 @@
           <i data-lucide="trash-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </button>
       </div>
-
-      <!-- Palette Colors -->
-      <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-0.5 no-scrollbar max-w-[130px] min-w-[110px] sm:max-w-none">
-        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-white ring-2 ring-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #6366f1;" data-color="#6366f1"></button>
-        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #ec4899;" data-color="#ec4899"></button>
-        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #ef4444;" data-color="#ef4444"></button>
-        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #f59e0b;" data-color="#f59e0b"></button>
-        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #10b981;" data-color="#10b981"></button>
-        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #06b6d4;" data-color="#06b6d4"></button>
-        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #f8fafc;" data-color="#f8fafc"></button>
-        <!-- Custom Color Picker Input -->
-        <div class="relative w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-slate-700 hover:scale-110 transition-transform flex-shrink-0">
-          <input type="color" id="color-custom" class="absolute -inset-1 cursor-pointer w-8 h-8 p-0 border-0 bg-transparent" value="#6366f1">
-        </div>
-      </div>
-    </div>
-
-    <!-- Brush Size Slider (Full width on mobile, inline on desktop) -->
-    <div class="relative flex items-center gap-3 w-full md:w-36 border-t border-slate-800/60 md:border-t-0 pt-2 md:pt-0">
-      <!-- Brush Size Preview Tooltip -->
-      <div id="brush-size-preview-bubble" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-2 shadow-2xl flex flex-col items-center justify-center gap-1 pointer-events-none transition-all duration-200 z-50 min-w-[64px]">
-        <div class="w-14 h-14 flex items-center justify-center bg-slate-950/40 rounded-lg border border-slate-800/50 overflow-hidden">
-          <div id="brush-size-preview-circle" class="rounded-full transition-all duration-75" style="width: 8px; height: 8px; background-color: #6366f1;"></div>
-        </div>
-        <span id="brush-size-preview-text" class="text-[10px] font-bold text-slate-300">8px</span>
-      </div>
-
-      <span class="text-[10px] sm:text-xs text-slate-400 select-none uppercase tracking-wider font-semibold">Size</span>
-      <input type="range" id="brush-size" min="2" max="50" value="8" class="w-full">
-      <span id="brush-size-display" class="text-xs font-semibold text-slate-300 w-4 text-right">8</span>
     </div>
   </div>
 
@@ -294,7 +301,7 @@
       <div class="space-y-4">
         <div>
           <label for="room-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Room Name</label>
-          <input type="text" id="room-input" class="w-full py-3 px-4 bg-slate-950 border border-slate-800 rounded-xl focus:border-brand-500 focus:outline-none text-slate-100 text-sm font-medium transition-colors" placeholder="e.g., design-sync">
+          <input type="text" id="room-input" class="w-full py-3 px-4 bg-slate-950 border border-slate-800 rounded-xl focus:border-brand-500 focus:outline-none text-slate-100 text-sm font-medium transition-colors opacity-60 cursor-not-allowed" value="room 1" disabled>
         </div>
         <div>
           <label for="username-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Your Name</label>
