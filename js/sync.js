@@ -561,7 +561,7 @@ export class SyncManager {
         console.error(`[Firebase] Failed to initialize or load snapshot:`, err);
       }
     } else {
-      console.warn(`[Firebase] NOT CONFIGURED. Real-time collaboration will work via WebRTC, but canvas state won't be maintained when everyone leaves. Set your config in public/js/sync.js.`);
+      console.warn(`[Firebase] NOT CONFIGURED. Real-time collaboration will work via WebRTC, but canvas state won't be maintained when everyone leaves. Set your config in js/sync.js.`);
     }
 
     // 2. Establish WebRTC connection via Firebase signaling

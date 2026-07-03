@@ -1,17 +1,17 @@
 # CoDraw — Real-Time Collaborative Drawing Progressive Web App (PWA)
 
-CoDraw is a production-ready, highly interactive Progressive Web App (PWA) that allows multiple users to collaborate in real-time on a layered vector drawing canvas. It leverages a lightweight peer-to-peer WebRTC synchronization layer and a robust layer-management engine to deliver an incredibly smooth drawing experience on both desktop and mobile devices.
+CoDraw is a production-ready, highly interactive Progressive Web App (PWA) that allows multiple users to collaborate in real-time on a layered vector drawing canvas. It leverages a lightweight peer-to-peer WebRTC synchronization layer (signaled via Firebase Realtime Database) and a robust layer-management engine to deliver an incredibly smooth drawing experience on both desktop and mobile devices.
 
 ## 🚀 Key Features
 
-* **Real-Time Collaboration**: Peer-to-peer state synchronization powered by **Yjs** CRDTs and WebRTC (`y-webrtc`). Coordinates stay perfectly in sync with zero merge conflicts.
+* **Real-Time P2P Collaboration**: Peer-to-peer state synchronization powered by **Yjs** CRDTs and WebRTC. Coordinates stay perfectly in sync with zero merge conflicts.
+* **Firebase Backend Signaling**: Uses Firebase Realtime Database for room presence, peer discovery, and WebRTC signaling.
 * **Canvas Engine & Vector Layers**: Built on **Konva.js** for immediate-mode rendering. Supports adding, deleting, renaming (via double-click), toggling visibility, and rearranging the Z-order of canvas layers.
 * **Responsive Navigation**: 
   * **Desktop**: Pinch-to-zoom using the mouse wheel, hand panning tool (drag to slide stage), and floating zoom buttons (+, -, reset).
   * **Mobile**: Full support for single-finger drawing and multi-touch gestures (pinch-to-zoom and two-finger panning).
 * **Collaborative Indicators**: Live peer presence tracking, listing active user avatars in the header, and rendering other users' mouse/touch cursors overlayed in their exact positions.
 * **Progressive Web App (PWA)**: Completely installable on iOS, Android, and desktop. Leverages a service worker (`sw.js`) to cache local assets and CDN libraries for complete offline functionality.
-* **All-In-One Signaling Server**: Includes a native Node.js HTTP static server combined with a WebSocket WebRTC signaling broker on a single port.
 
 ---
 
@@ -21,8 +21,8 @@ CoDraw is a production-ready, highly interactive Progressive Web App (PWA) that 
 * **Styling**: Tailwind CSS (via CDN with dynamic configurations) and Google Fonts.
 * **Icons**: Lucide Icons.
 * **Canvas framework**: Konva.js.
-* **CRDT & Sync**: Yjs + y-webrtc (mapped via HTML importmap).
-* **Backend**: Node.js standard modules (`http`, `fs`, `path`) + WebSockets (`ws`).
+* **CRDT & Sync**: Yjs + y-webrtc (via HTML importmap / custom signaling provider).
+* **Backend**: PHP standard web server serving static files, Firebase Realtime Database for presence tracking and WebRTC signaling.
 
 ---
 
@@ -30,21 +30,18 @@ CoDraw is a production-ready, highly interactive Progressive Web App (PWA) that 
 
 ```text
 Drawing_WD/
-├── public/
-│   ├── js/
-│   │   ├── app.js            # Registers Service Worker, boots managers, prevents touch-action defaults
-│   │   ├── canvas.js         # Configures Konva Stage, normalizes coordinates, handles pinch/pan events
-│   │   ├── sync.js           # Initializes Y.Doc, WebRTC connection, and awareness states
-│   │   └── ui.js             # Manages toolbar picker buttons, layers list rendering, and cursor overlays
-│   ├── icon-192.png          # App icon (192x192) for PWA installation
-│   ├── icon-512.png          # App icon (512x512) for PWA installation
-│   ├── index.html            # Core layout structure, imports importmaps and Lucide
-│   ├── manifest.json         # PWA Manifest properties
-│   └── sw.js                 # Service Worker caching scripts (static and dynamic CDN caching)
-├── .gitignore                # Configures file paths ignored by Git
-├── package.json              # App dependencies (ws) and dev runner scripts
-├── README.md                 # Project documentation
-└── server.js                 # Unified static file server and WebRTC WebSocket signaling broker
+├── js/
+│   ├── app.js            # Registers Service Worker, boots managers, prevents touch-action defaults
+│   ├── canvas.js         # Configures Konva Stage, normalizes coordinates, handles pinch/pan events
+│   ├── sync.js           # Initializes Y.Doc, WebRTC connection, and awareness states
+│   └── ui.js             # Manages toolbar picker buttons, layers list rendering, and cursor overlays
+├── .gitignore            # Configures file paths ignored by Git
+├── icon-192.png          # App icon (192x192) for PWA installation
+├── icon-512.png          # App icon (512x512) for PWA installation
+├── index.php             # Core layout structure and application entry point
+├── manifest.json         # PWA Manifest properties
+├── sw.js                 # Service Worker caching scripts (static and dynamic CDN caching)
+└── README.md             # Project documentation
 ```
 
 ---
@@ -54,22 +51,13 @@ Drawing_WD/
 Follow these quick steps to get the application running on your computer:
 
 ### 1. Prerequisites
-Ensure you have [Node.js](https://nodejs.org) installed (version 16 or newer recommended).
+Ensure you have [PHP](https://www.php.net) installed (version 7.4 or newer recommended).
 
-### 2. Install Dependencies
-Navigate to the root directory of the project and install node packages:
+### 2. Start the Server
+Run the local PHP CLI development server from the workspace root:
 ```bash
-npm install
+php -S localhost:3000
 ```
-
-### 3. Start the Server
-Run the local server script:
-```bash
-npm start
-```
-By default, the server will launch on:
-* Frontend & Assets: **`http://localhost:3000`**
-* WebSocket Signaling Broker: **`ws://localhost:3000`**
 
 Open [http://localhost:3000](http://localhost:3000) in multiple browser windows or share the URL on your local network to start collaborating!
 

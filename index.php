@@ -1,4 +1,263 @@
-<?php
-// Przekierowanie do katalogu public, w którym znajdują się pliki frontendu aplikacji.
-header("Location: public/index.html");
-exit;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CoDraw - Collaborative Canvas</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    /* Hide scrollbars */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Custom slider styles */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      background: #334155;
+      height: 6px;
+      border-radius: 9999px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -5px;
+      background-color: #6366f1;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+      transition: transform 0.1s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+  </style>
+
+  <!-- Konva.js drawing framework -->
+  <script src="https://cdn.jsdelivr.net/npm/konva@9.3.15/konva.min.js"></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Import map for resolving Yjs and WebRTC duplicate instances -->
+  <script type="importmap">
+    {
+      "imports": {
+        "yjs": "https://esm.sh/yjs@13.6.8",
+        "y-webrtc": "https://esm.sh/y-webrtc@10.2.5?external=yjs"
+      }
+    }
+  </script>
+
+  <!-- Application Entry Point -->
+  <script type="module" src="js/app.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 w-screen h-screen flex flex-col relative select-none">
+
+  <!-- 1. Header & Status Bar -->
+  <header class="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 z-20 flex justify-between items-center pointer-events-none gap-2">
+    <!-- App Logo & Room Title -->
+    <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl shadow-xl pointer-events-auto transition-all duration-300 hover:border-slate-700">
+      <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-emerald-500 flex items-center justify-center font-bold text-white shadow-md shadow-brand-500/20 text-sm sm:text-base">
+        C
+      </div>
+      <div>
+        <h1 class="text-xs sm:text-sm font-semibold tracking-wide">CoDraw Canvas</h1>
+        <div class="flex items-center gap-1 sm:gap-1.5 text-slate-400 text-[9px] sm:text-[10px]">
+          <span id="connection-indicator" class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span id="connection-status">Connecting...</span>
+        </div>
+      </div>
+      <!-- Share Room Link Button -->
+      <button id="btn-share" class="ml-1 sm:ml-2 p-1 sm:p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 transition-colors duration-200" title="Udostępnij link do pokoju">
+        <i data-lucide="share-2" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+      </button>
+    </div>
+
+    <!-- Active Collaborators List -->
+    <div id="collaborators-container" class="flex items-center gap-1.5 sm:gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-2 py-1 sm:px-3 sm:py-1.5 rounded-2xl shadow-xl pointer-events-auto max-w-[120px] sm:max-w-xs md:max-w-md overflow-hidden">
+      <div class="flex -space-x-1.5 sm:-space-x-2 overflow-hidden" id="collaborator-avatars">
+        <!-- Avatars injected dynamically -->
+      </div>
+      <span id="collaborator-count" class="text-[10px] sm:text-xs text-slate-400 ml-1 sm:ml-1.5 whitespace-nowrap">1 active</span>
+    </div>
+  </header>
+
+  <!-- 2. Drawing Area Container -->
+  <main id="canvas-container" class="w-full h-full flex-grow relative bg-[#0f172a] overflow-hidden touch-none"></main>
+
+  <!-- 3. Remote Cursor Overlay -->
+  <div id="cursors-overlay" class="absolute inset-0 pointer-events-none z-30"></div>
+
+  <!-- 4. Floating Main Toolbar -->
+  <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col md:flex-row items-center gap-2.5 md:gap-4 bg-slate-900/80 backdrop-blur-md border border-slate-800 p-2.5 md:p-3 rounded-2xl md:rounded-3xl shadow-2xl max-w-[95%] w-[calc(100%-2rem)] md:w-auto transition-all duration-300 hover:border-slate-700">
+    <!-- Top Row on Mobile (Tools & Colors) -->
+    <div class="flex items-center justify-between w-full md:w-auto gap-2">
+      <!-- Active Tools -->
+      <div class="flex items-center gap-1 border-r border-slate-800 pr-2 md:pr-3">
+        <!-- Brush Tool -->
+        <button id="tool-brush" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 bg-brand-600 text-white shadow-lg shadow-brand-500/20" title="Brush Tool">
+          <i data-lucide="brush" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+        <!-- Eraser Tool -->
+        <button id="tool-eraser" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Eraser Tool">
+          <i data-lucide="eraser" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+        <!-- Pan Tool -->
+        <button id="tool-pan" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Pan / Navigate Canvas">
+          <i data-lucide="hand" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+        <!-- Clear Canvas -->
+        <button id="tool-clear" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-rose-400 hover:bg-rose-500/10" title="Clear Active Layer">
+          <i data-lucide="trash-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+      </div>
+
+      <!-- Palette Colors -->
+      <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-0.5 no-scrollbar max-w-[130px] min-w-[110px] sm:max-w-none">
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-white ring-2 ring-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #6366f1;" data-color="#6366f1"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #ec4899;" data-color="#ec4899"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #ef4444;" data-color="#ef4444"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #f59e0b;" data-color="#f59e0b"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #10b981;" data-color="#10b981"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #06b6d4;" data-color="#06b6d4"></button>
+        <button class="color-picker-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-transparent transition-transform hover:scale-110 flex-shrink-0" style="background-color: #f8fafc;" data-color="#f8fafc"></button>
+        <!-- Custom Color Picker Input -->
+        <div class="relative w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-slate-700 hover:scale-110 transition-transform flex-shrink-0">
+          <input type="color" id="color-custom" class="absolute -inset-1 cursor-pointer w-8 h-8 p-0 border-0 bg-transparent" value="#6366f1">
+        </div>
+      </div>
+    </div>
+
+    <!-- Brush Size Slider (Full width on mobile, inline on desktop) -->
+    <div class="flex items-center gap-3 w-full md:w-36 border-t border-slate-800/60 md:border-t-0 pt-2 md:pt-0">
+      <span class="text-[10px] sm:text-xs text-slate-400 select-none uppercase tracking-wider font-semibold">Size</span>
+      <input type="range" id="brush-size" min="2" max="50" value="8" class="w-full">
+      <span id="brush-size-display" class="text-xs font-semibold text-slate-300 w-4 text-right">8</span>
+    </div>
+  </div>
+
+  <!-- 5. Floating Side Layer Manager Toggle -->
+  <button id="layer-manager-toggle" class="absolute top-20 right-4 z-20 p-3 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl text-slate-300 hover:text-slate-100 hover:border-slate-700 transition-all duration-300 pointer-events-auto" title="Layers Panel">
+    <i data-lucide="layers" class="w-5 h-5"></i>
+  </button>
+
+  <!-- 6. Layer Manager Drawer Panel (Slides in from the right) -->
+  <aside id="layer-panel" class="absolute top-0 right-0 bottom-0 w-80 bg-slate-900/95 backdrop-blur-md border-l border-slate-800/80 shadow-2xl z-40 transform translate-x-full transition-transform duration-300 flex flex-col">
+    <!-- Panel Header -->
+    <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+      <div class="flex items-center gap-2">
+        <i data-lucide="layers" class="w-4.5 h-4.5 text-brand-500"></i>
+        <h2 class="font-semibold text-sm tracking-wide">Layer Manager</h2>
+      </div>
+      <button id="layer-panel-close" class="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors">
+        <i data-lucide="x" class="w-4.5 h-4.5"></i>
+      </button>
+    </div>
+
+    <!-- Add Layer Button -->
+    <div class="p-4 border-b border-slate-800/50">
+      <button id="layer-add" class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium text-xs shadow-lg shadow-brand-500/10 hover:shadow-brand-500/20 active:scale-95 transition-all duration-200">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        New Drawing Layer
+      </button>
+    </div>
+
+    <!-- Layers List -->
+    <div class="flex-grow overflow-y-auto p-4 space-y-2.5" id="layers-list-container">
+      <!-- Dynamic list elements will be added here -->
+    </div>
+
+    <!-- Panel Footer info -->
+    <div class="p-4 border-t border-slate-800/80 bg-slate-950/40 text-[10px] text-slate-500 flex justify-between items-center">
+      <span>Z-index managed dynamically</span>
+      <span>Double click layer to rename</span>
+    </div>
+  </aside>
+
+  <!-- 7. Connection Setup Modal (Fallback/Manual Entry Room Name) -->
+  <div id="room-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-lg flex items-center justify-center z-50 transition-opacity duration-300">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xl mx-4">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-500 flex items-center justify-center font-bold text-white shadow-xl shadow-brand-500/25 mb-6 text-xl mx-auto">
+        C
+      </div>
+      <h2 class="text-xl font-bold text-center tracking-tight mb-2">Join Drawing Canvas</h2>
+      <p class="text-xs text-slate-400 text-center mb-6">Enter a room name to share a real-time collaborative workspace with others.</p>
+      
+      <div class="space-y-4">
+        <div>
+          <label for="room-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Room Name</label>
+          <input type="text" id="room-input" class="w-full py-3 px-4 bg-slate-950 border border-slate-800 rounded-xl focus:border-brand-500 focus:outline-none text-slate-100 text-sm font-medium transition-colors" placeholder="e.g., design-sync">
+        </div>
+        <div>
+          <label for="username-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Your Name</label>
+          <input type="text" id="username-input" class="w-full py-3 px-4 bg-slate-950 border border-slate-800 rounded-xl focus:border-brand-500 focus:outline-none text-slate-100 text-sm font-medium transition-colors" placeholder="e.g., Sarah">
+        </div>
+        <button id="room-join" class="w-full py-3 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white rounded-xl font-semibold text-sm transition-all shadow-xl shadow-brand-500/10">
+          Enter Room
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Floating Zoom & Navigation Controls (hidden on mobile, native pinch used instead) -->
+  <div class="absolute bottom-6 right-6 z-20 hidden md:flex flex-col gap-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-800 p-2 rounded-2xl shadow-2xl transition-all duration-300 hover:border-slate-700 pointer-events-auto">
+    <button id="zoom-in" class="p-2 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 active:scale-95 transition-all flex items-center justify-center" title="Zoom In">
+      <i data-lucide="zoom-in" class="w-4 h-4"></i>
+    </button>
+    <button id="zoom-out" class="p-2 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 active:scale-95 transition-all flex items-center justify-center" title="Zoom Out">
+      <i data-lucide="zoom-out" class="w-4 h-4"></i>
+    </button>
+    <button id="zoom-reset" class="py-1 px-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 active:scale-95 transition-all text-[10px] font-semibold tracking-wide uppercase border border-slate-800/80 text-center" title="Reset Canvas Zoom">
+      Reset
+    </button>
+  </div>
+
+</body>
+</html>
