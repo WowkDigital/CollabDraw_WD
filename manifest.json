@@ -18,5 +18,23 @@
   "background_color": "#0f172a",
   "theme_color": "#4f46e5",
   "display": "standalone",
-  "orientation": "portrait-primary"
+  "orientation": "portrait-primary",
+  "widgets": [
+    {
+      "name": "CoDraw Live Canvas",
+      "description": "Podgląd Twojej aktualnej tablicy rysunkowej",
+      "tag": "codraw-board-widget",
+      "ms_ac_template": "widgets/board-template.json",
+      "data": "widgets/board-data.json",
+      "type": "application/json",
+      "screenshots": [
+        {
+          "src": "icon-512.png",
+          "sizes": "512x512",
+          "type": "image/png",
+          "label": "Widget Preview"
+        }
+      ]
+    }
+  ]
 }

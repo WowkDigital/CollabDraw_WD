@@ -10,7 +10,9 @@ const STATIC_ASSETS = [
   'js/sync.js',
   'js/ui.js',
   'icon-192.png',
-  'icon-512.png'
+  'icon-512.png',
+  'widgets/board-template.json',
+  'widgets/board-data.json'
 ];
 
 // Install Event - Pre-cache critical app shell
@@ -50,6 +52,22 @@ self.addEventListener('fetch', (event) => {
 
   // We only intercept GET requests
   if (request.method !== 'GET') return;
+
+  // Intercept widget image request
+  if (url.pathname.endsWith('/widgets/current-board.png')) {
+    event.respondWith(
+      caches.open('codraw-widget-cache').then((cache) => {
+        return cache.match(url.pathname).then((response) => {
+          if (response) {
+            return response;
+          }
+          // Fallback to cached default icon if drawing is not available yet
+          return caches.match('icon-192.png') || fetch('icon-192.png');
+        });
+      })
+    );
+    return;
+  }
 
   // For WebSockets or local signaling endpoints, do not intercept
   if (url.protocol === 'ws:' || url.protocol === 'wss:' || url.pathname.includes('/socket.io/')) {
@@ -100,3 +118,81 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// --- PWA Widget Lifecycle & Message Handlers ---
+
+// Listen for message from client to update widgets
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'UPDATE_WIDGET_PREVIEW') {
+    event.waitUntil(updatePWAWidget());
+  }
+});
+
+self.addEventListener('widgetinstall', (event) => {
+  event.waitUntil(updatePWAWidgetInstance(event.widget));
+});
+
+self.addEventListener('widgetuninstall', (event) => {
+  // Clean up cache or resources if needed
+});
+
+self.addEventListener('widgetresume', (event) => {
+  event.waitUntil(updatePWAWidgetInstance(event.widget));
+});
+
+// Update all active widget instances matching our tag
+async function updatePWAWidget() {
+  if (!self.widgets || typeof self.widgets.updateByTag !== 'function') {
+    return;
+  }
+  try {
+    const template = await fetchWidgetTemplate();
+    const data = await fetchWidgetData();
+    await self.widgets.updateByTag('codraw-board-widget', {
+      template,
+      data
+    });
+  } catch (err) {
+    console.error('[Service Worker] Error updating PWA widget:', err);
+  }
+}
+
+// Update a specific widget instance
+async function updatePWAWidgetInstance(widget) {
+  if (!self.widgets || typeof self.widgets.updateByInstanceId !== 'function') {
+    return;
+  }
+  try {
+    const template = await fetchWidgetTemplate();
+    const data = await fetchWidgetData();
+    await self.widgets.updateByInstanceId(widget.id, {
+      template,
+      data
+    });
+  } catch (err) {
+    console.error(`[Service Worker] Error updating widget instance ${widget.id}:`, err);
+  }
+}
+
+// Helper to fetch adaptive card template
+async function fetchWidgetTemplate() {
+  const response = await fetch('widgets/board-template.json');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch widget template: ${response.statusText}`);
+  }
+  return await response.text();
+}
+
+// Helper to construct dynamic widget data
+async function fetchWidgetData() {
+  const scope = self.registration.scope;
+  const boardImageUrl = new URL('widgets/current-board.png', scope).href;
+  const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  return JSON.stringify({
+    boardImageUrl: boardImageUrl + '?t=' + Date.now(),
+    lastUpdated: `Zaktualizowano o ${timeString}`,
+    appUrl: scope
+  });
+}
+

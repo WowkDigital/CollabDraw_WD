@@ -251,6 +251,7 @@ export class CanvasManager {
       if (this.onLocalStrokeEnd) {
         this.onLocalStrokeEnd();
       }
+      this.updateWidgetPreview();
     });
 
     // 3. Desktop Mouse Wheel Zoom
@@ -357,6 +358,7 @@ export class CanvasManager {
     }
     
     this.stage.batchDraw();
+    this.updateWidgetPreview();
   }
 
   deleteLayer(layerId) {
@@ -381,6 +383,7 @@ export class CanvasManager {
       }
 
       this.stage.batchDraw();
+      this.updateWidgetPreview();
     }
   }
 
@@ -395,6 +398,7 @@ export class CanvasManager {
     if (layer) {
       layer.visible(visible);
       this.stage.batchDraw();
+      this.updateWidgetPreview();
     }
   }
 
@@ -414,6 +418,7 @@ export class CanvasManager {
       }
     });
     this.stage.batchDraw();
+    this.updateWidgetPreview();
   }
 
   clearLayer(layerId) {
@@ -428,6 +433,7 @@ export class CanvasManager {
         child.destroy();
       });
       layer.batchDraw();
+      this.updateWidgetPreview();
     }
   }
 
@@ -453,6 +459,7 @@ export class CanvasManager {
 
     layer.add(remoteLine);
     layer.batchDraw();
+    this.updateWidgetPreview();
     
     this.shapes.set(shapeId, remoteLine);
   }
@@ -464,6 +471,7 @@ export class CanvasManager {
       const layer = this.layers.get(layerId);
       if (layer) {
         layer.batchDraw();
+        this.updateWidgetPreview();
       }
     }
   }
@@ -511,6 +519,51 @@ export class CanvasManager {
     });
 
     layer.batchDraw();
+    this.updateWidgetPreview();
+  }
+
+  updateWidgetPreview() {
+    if (!this.stage) return;
+    if (this._widgetUpdateTimeout) {
+      clearTimeout(this._widgetUpdateTimeout);
+    }
+    this._widgetUpdateTimeout = setTimeout(() => {
+      this._doUpdateWidgetPreview();
+    }, 1500);
+  }
+
+  async _doUpdateWidgetPreview() {
+    try {
+      if (typeof caches === 'undefined') return;
+
+      const dataUrl = this.stage.toDataURL({
+        mimeType: 'image/png',
+        quality: 0.75,
+        pixelRatio: 0.5
+      });
+
+      const cache = await caches.open('codraw-widget-cache');
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      
+      const cacheKey = new URL('widgets/current-board.png', window.location.href).pathname;
+
+      await cache.put(cacheKey, new Response(blob, {
+        headers: {
+          'Content-Type': 'image/png',
+          'Content-Length': blob.size.toString(),
+          'Cache-Control': 'no-store'
+        }
+      }));
+
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'UPDATE_WIDGET_PREVIEW'
+        });
+      }
+    } catch (e) {
+      console.error('Failed to update widget preview:', e);
+    }
   }
 
   destroy() {
