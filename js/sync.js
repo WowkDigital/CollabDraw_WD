@@ -142,7 +142,7 @@ export class SyncManager {
   setupObservers() {
     // 1. Observe changes in the list of layers
     this.yLayers.observeDeep((events, transaction) => {
-      if (transaction.local) return; // Prevent loop: ignore local actions
+      if (transaction.local && transaction.origin !== this.undoManager) return; // Prevent loop: ignore local actions (except undo/redo)
 
       events.forEach((event) => {
         // Handle changes in individual layers properties or shapes
@@ -198,7 +198,7 @@ export class SyncManager {
 
     // 2. Observe changes in layers Z-index (ordering)
     this.yLayerOrder.observe((event, transaction) => {
-      if (transaction.local) return;
+      if (transaction.local && transaction.origin !== this.undoManager) return;
       if (this.onRemoteLayerOrderChange) {
         this.onRemoteLayerOrderChange(this.yLayerOrder.toArray());
       }
@@ -257,7 +257,7 @@ export class SyncManager {
     }
 
     const observer = (event, transaction) => {
-      if (transaction.local) return;
+      if (transaction.local && transaction.origin !== this.undoManager) return;
       if (this.onRemotePointsChange) {
         this.onRemotePointsChange(layerId, shapeId, pointsYArray.toArray());
       }

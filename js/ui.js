@@ -322,14 +322,18 @@ export class UIManager {
       this.redoBtn.addEventListener('click', () => this.sync.redo());
     }
 
-    // Keyboard shortcuts (Ctrl+Z, Ctrl+Y)
+    // Keyboard shortcuts (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z)
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
       if (e.ctrlKey || e.metaKey) {
         if (e.key.toLowerCase() === 'z') {
           e.preventDefault();
-          this.sync.undo();
+          if (e.shiftKey) {
+            this.sync.redo();
+          } else {
+            this.sync.undo();
+          }
         } else if (e.key.toLowerCase() === 'y') {
           e.preventDefault();
           this.sync.redo();
