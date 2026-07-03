@@ -498,6 +498,9 @@ export class SyncManager {
     this.yLayers = this.doc.getMap('layers');
     this.yLayerOrder = this.doc.getArray('layerOrder');
 
+    // Undo/Redo manager tracking layers and ordering
+    this.undoManager = new Y.UndoManager([this.yLayers, this.yLayerOrder]);
+
     // Callback hooks for the application UI/Canvas to respond to remote changes
     this.onRemoteLayerChange = null; // (type, layerId, layerData)
     this.onRemoteLayerOrderChange = null; // (layerOrderArray)
@@ -723,7 +726,11 @@ export class SyncManager {
   observeShapePoints(layerId, shapeId, pointsYArray) {
     if (this.shapeObservers.has(shapeId)) {
       // Remove old observer if already set
-      pointsYArray.unobserve(this.shapeObservers.get(shapeId));
+      try {
+        pointsYArray.unobserve(this.shapeObservers.get(shapeId));
+      } catch (err) {
+        // Ignore if already unobserved
+      }
     }
 
     const observer = (event, transaction) => {
@@ -798,7 +805,7 @@ export class SyncManager {
   }
 
   // Initialize a new drawing stroke in the Yjs document
-  startShape(layerId, shapeId, tool, color, strokeWidth) {
+  startShape(layerId, shapeId, tool, color, strokeWidth, type = 'line', text = '') {
     let activeShapeMap = null;
 
     this.doc.transact(() => {
@@ -809,10 +816,13 @@ export class SyncManager {
       const shapeMap = new Y.Map();
 
       shapeMap.set('id', shapeId);
-      shapeMap.set('type', 'line');
+      shapeMap.set('type', type);
       shapeMap.set('color', color);
       shapeMap.set('strokeWidth', strokeWidth);
       shapeMap.set('globalCompositeOperation', tool === 'eraser' ? 'destination-out' : 'source-over');
+      if (type === 'text') {
+        shapeMap.set('text', text);
+      }
 
       const pointsArray = new Y.Array();
       shapeMap.set('points', pointsArray);
@@ -824,11 +834,34 @@ export class SyncManager {
     return activeShapeMap;
   }
 
+  undo() {
+    if (this.undoManager) {
+      this.undoManager.undo();
+    }
+  }
+
+  redo() {
+    if (this.undoManager) {
+      this.undoManager.redo();
+    }
+  }
+
   // Push new points coordinates continuously to the live shape
   addPointsToShape(shapeMap, coordinates) {
     const pointsArray = shapeMap.get('points');
     if (pointsArray) {
       pointsArray.push(coordinates);
+    }
+  }
+
+  // Replace all points coordinates at once (for shapes like rect/circle/arrow)
+  updateShapePoints(shapeMap, coordinates) {
+    const pointsArray = shapeMap.get('points');
+    if (pointsArray) {
+      this.doc.transact(() => {
+        pointsArray.delete(0, pointsArray.length);
+        pointsArray.push(coordinates);
+      });
     }
   }
 

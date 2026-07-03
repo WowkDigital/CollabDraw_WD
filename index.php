@@ -118,6 +118,10 @@
       <button id="btn-share" class="ml-1 sm:ml-2 p-1 sm:p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 transition-colors duration-200" title="Udostępnij link do pokoju">
         <i data-lucide="share-2" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
       </button>
+      <!-- Export Canvas Button -->
+      <button id="btn-export" class="ml-1 p-1 sm:p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 transition-colors duration-200" title="Eksportuj rysunek">
+        <i data-lucide="download" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+      </button>
     </div>
 
     <!-- Active Collaborators List -->
@@ -149,6 +153,55 @@
         <button id="tool-eraser" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Eraser Tool">
           <i data-lucide="eraser" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </button>
+
+        <!-- Shapes Tool with Dropdown -->
+        <div class="relative inline-block">
+          <button id="tool-shapes" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Shapes Tool">
+            <i data-lucide="shapes" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+          </button>
+          <!-- Shapes Dropdown Menu -->
+          <div id="shapes-menu" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden bg-slate-900 border border-slate-800 p-1.5 rounded-xl shadow-2xl flex flex-col gap-1 z-50">
+            <button id="shape-straight-line" class="p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 whitespace-nowrap text-xs">
+              <i data-lucide="minus" class="w-4 h-4"></i> Linia prosta
+            </button>
+            <button id="shape-rect" class="p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 whitespace-nowrap text-xs">
+              <i data-lucide="square" class="w-4 h-4"></i> Prostokąt
+            </button>
+            <button id="shape-circle" class="p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 whitespace-nowrap text-xs">
+              <i data-lucide="circle" class="w-4 h-4"></i> Okrąg
+            </button>
+            <button id="shape-arrow" class="p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2 whitespace-nowrap text-xs">
+              <i data-lucide="arrow-up-right" class="w-4 h-4"></i> Strzałka
+            </button>
+          </div>
+        </div>
+
+        <!-- Text Tool -->
+        <button id="tool-text" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Text Tool">
+          <i data-lucide="type" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+
+        <!-- Eyedropper Tool -->
+        <button id="tool-eyedropper" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Eyedropper Tool">
+          <i data-lucide="pipette" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+
+        <!-- Divider -->
+        <div class="h-6 w-[1px] bg-slate-800 mx-1"></div>
+
+        <!-- Undo Tool -->
+        <button id="btn-undo" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Cofnij (Ctrl+Z)">
+          <i data-lucide="undo-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+
+        <!-- Redo Tool -->
+        <button id="btn-redo" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Ponów (Ctrl+Y)">
+          <i data-lucide="redo-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+
+        <!-- Divider -->
+        <div class="h-6 w-[1px] bg-slate-800 mx-1"></div>
+
         <!-- Pan Tool -->
         <button id="tool-pan" class="p-2 sm:p-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="Pan / Navigate Canvas">
           <i data-lucide="hand" class="w-4 h-4 sm:w-5 sm:h-5"></i>
@@ -265,6 +318,24 @@
     <button id="zoom-reset" class="py-1 px-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 active:scale-95 transition-all text-[10px] font-semibold tracking-wide uppercase border border-slate-800/80 text-center" title="Reset Canvas Zoom">
       Reset
     </button>
+  </div>
+
+  <!-- Export Format Modal -->
+  <div id="export-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center z-50 transition-opacity duration-300 opacity-0">
+    <div class="w-full max-w-xs bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl mx-4 space-y-4">
+      <h3 class="font-bold text-center tracking-wide text-sm">Export Canvas</h3>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="export-png" class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-colors flex flex-col items-center gap-1.5">
+          <i data-lucide="image" class="w-5 h-5 text-brand-500"></i> PNG (Transparent)
+        </button>
+        <button id="export-jpeg" class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-colors flex flex-col items-center gap-1.5">
+          <i data-lucide="image" class="w-5 h-5 text-emerald-500"></i> JPEG (Dark Bg)
+        </button>
+      </div>
+      <button id="export-cancel" class="w-full py-2 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-xl text-xs transition-colors">
+        Cancel
+      </button>
+    </div>
   </div>
 
 </body>

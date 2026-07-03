@@ -6,6 +6,21 @@ export class UIManager {
     // UI Elements cache
     this.brushBtn = document.getElementById('tool-brush');
     this.eraserBtn = document.getElementById('tool-eraser');
+    this.shapesBtn = document.getElementById('tool-shapes');
+    this.shapesMenu = document.getElementById('shapes-menu');
+    this.textBtn = document.getElementById('tool-text');
+    this.eyedropperBtn = document.getElementById('tool-eyedropper');
+    
+    this.undoBtn = document.getElementById('btn-undo');
+    this.redoBtn = document.getElementById('btn-redo');
+    this.exportBtn = document.getElementById('btn-export');
+    
+    // Export Modal Elements
+    this.exportModal = document.getElementById('export-modal');
+    this.exportPngBtn = document.getElementById('export-png');
+    this.exportJpegBtn = document.getElementById('export-jpeg');
+    this.exportCancelBtn = document.getElementById('export-cancel');
+
     this.panBtn = document.getElementById('tool-pan');
     this.clearBtn = document.getElementById('tool-clear');
     this.sizeSlider = document.getElementById('brush-size');
@@ -192,6 +207,185 @@ export class UIManager {
     this.brushBtn.addEventListener('click', () => this.setTool('brush'));
     this.eraserBtn.addEventListener('click', () => this.setTool('eraser'));
     this.panBtn.addEventListener('click', () => this.setTool('pan'));
+    this.textBtn.addEventListener('click', () => this.setTool('text'));
+    this.eyedropperBtn.addEventListener('click', () => this.setTool('eyedropper'));
+
+    // Shapes Tool toggle
+    if (this.shapesBtn) {
+      this.shapesBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.shapesMenu) {
+          this.shapesMenu.classList.toggle('hidden');
+        }
+      });
+    }
+
+    // Hide shapes menu when clicking anywhere else
+    document.addEventListener('click', () => {
+      if (this.shapesMenu) {
+        this.shapesMenu.classList.add('hidden');
+      }
+    });
+
+    // Shapes options buttons
+    const shapeOptions = [
+      { id: 'shape-straight-line', tool: 'straight-line' },
+      { id: 'shape-rect', tool: 'rect' },
+      { id: 'shape-circle', tool: 'circle' },
+      { id: 'shape-arrow', tool: 'arrow' }
+    ];
+
+    shapeOptions.forEach(opt => {
+      const btn = document.getElementById(opt.id);
+      if (btn) {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.setTool(opt.tool);
+          if (this.shapesMenu) {
+            this.shapesMenu.classList.add('hidden');
+          }
+        });
+      }
+    });
+
+    // Eyedropper color picked callback
+    this.canvas.onColorPicked = (color) => {
+      this.setColor(color);
+      const colorPickers = document.querySelectorAll('.color-picker-btn');
+      let matched = false;
+      colorPickers.forEach(b => {
+        if (b.getAttribute('data-color') === color) {
+          b.classList.replace('border-transparent', 'border-white');
+          matched = true;
+        } else {
+          b.classList.replace('border-white', 'border-transparent');
+        }
+      });
+      if (!matched) {
+        this.customColorInput.parentElement.classList.add('border-white');
+      } else {
+        this.customColorInput.parentElement.classList.remove('border-white');
+      }
+      this.setTool('brush');
+    };
+
+    // Text tool click handler (inline editor)
+    this.canvas.onTextToolClick = (x, y) => {
+      const pos = this.canvas.stage.getPointerPosition();
+      if (!pos) return;
+
+      const container = document.getElementById('canvas-container');
+      const input = document.createElement('textarea');
+      input.className = "absolute z-50 p-2 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg text-sm focus:outline-none focus:border-brand-500 shadow-2xl resize-none";
+      input.style.left = `${pos.x}px`;
+      input.style.top = `${pos.y}px`;
+      input.style.width = "180px";
+      input.style.height = "60px";
+      input.placeholder = "Wpisz tekst...";
+      
+      container.appendChild(input);
+      input.focus();
+
+      const submitText = () => {
+        input.removeEventListener('blur', submitText);
+        const text = input.value.trim();
+        if (text) {
+          this.canvas.addTextShape(x, y, text);
+        }
+        input.remove();
+        this.setTool('brush');
+      };
+
+      input.addEventListener('blur', submitText);
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          submitText();
+        }
+        if (e.key === 'Escape') {
+          input.removeEventListener('blur', submitText);
+          input.remove();
+          this.setTool('brush');
+        }
+      });
+    };
+
+    // Undo / Redo buttons
+    if (this.undoBtn) {
+      this.undoBtn.addEventListener('click', () => this.sync.undo());
+    }
+    if (this.redoBtn) {
+      this.redoBtn.addEventListener('click', () => this.sync.redo());
+    }
+
+    // Keyboard shortcuts (Ctrl+Z, Ctrl+Y)
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          this.sync.undo();
+        } else if (e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          this.sync.redo();
+        }
+      }
+    });
+
+    // Export Dialog interactions
+    if (this.exportBtn) {
+      this.exportBtn.addEventListener('click', () => {
+        if (this.exportModal) {
+          this.exportModal.classList.remove('hidden');
+          requestAnimationFrame(() => {
+            this.exportModal.classList.remove('opacity-0');
+            this.exportModal.classList.add('opacity-100');
+          });
+        }
+      });
+    }
+
+    const closeExportModal = () => {
+      if (this.exportModal) {
+        this.exportModal.classList.remove('opacity-100');
+        this.exportModal.classList.add('opacity-0');
+        setTimeout(() => {
+          if (this.exportModal.classList.contains('opacity-0')) {
+            this.exportModal.classList.add('hidden');
+          }
+        }, 200);
+      }
+    };
+
+    if (this.exportCancelBtn) {
+      this.exportCancelBtn.addEventListener('click', closeExportModal);
+    }
+
+    if (this.exportPngBtn) {
+      this.exportPngBtn.addEventListener('click', () => {
+        closeExportModal();
+        const dataUrl = this.canvas.stage.toDataURL({
+          mimeType: 'image/png',
+          pixelRatio: 2
+        });
+        this.triggerDownload(dataUrl, 'codraw-export.png');
+      });
+    }
+
+    if (this.exportJpegBtn) {
+      this.exportJpegBtn.addEventListener('click', () => {
+        closeExportModal();
+        const dataUrl = this.canvas.stage.toDataURL({
+          mimeType: 'image/jpeg',
+          quality: 0.95,
+          pixelRatio: 2,
+          backgroundColor: '#0f172a'
+        });
+        this.triggerDownload(dataUrl, 'codraw-export.jpg');
+      });
+    }
 
     // Zoom Buttons
     this.zoomInBtn.addEventListener('click', () => this.canvas.zoomStage(1.2));
@@ -279,7 +473,7 @@ export class UIManager {
     this.canvas.setTool(tool);
     
     // Reset all tool button styles
-    [this.brushBtn, this.eraserBtn, this.panBtn].forEach(btn => {
+    [this.brushBtn, this.eraserBtn, this.panBtn, this.shapesBtn, this.textBtn, this.eyedropperBtn].forEach(btn => {
       if (btn) {
         btn.classList.remove('bg-brand-600', 'text-white');
         btn.classList.add('text-slate-400', 'hover:bg-slate-800');
@@ -291,6 +485,9 @@ export class UIManager {
     if (tool === 'brush') activeBtn = this.brushBtn;
     else if (tool === 'eraser') activeBtn = this.eraserBtn;
     else if (tool === 'pan') activeBtn = this.panBtn;
+    else if (tool === 'text') activeBtn = this.textBtn;
+    else if (tool === 'eyedropper') activeBtn = this.eyedropperBtn;
+    else if (['straight-line', 'rect', 'circle', 'arrow'].includes(tool)) activeBtn = this.shapesBtn;
 
     if (activeBtn) {
       activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
@@ -303,6 +500,15 @@ export class UIManager {
     this.canvas.currentColor = color;
     this.customColorInput.value = color;
     this.updateSizePreview(this.sizeSlider.value);
+  }
+
+  triggerDownload(dataUrl, filename) {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   updateSizePreview(val) {
@@ -347,12 +553,16 @@ export class UIManager {
   // 4. Bind events between Sync and Canvas modules (Wiring the logic)
   bindSyncAndCanvas() {
     // LOCAL CANVAS -> SYNC WRITES
-    this.canvas.onLocalStrokeStart = (layerId, shapeId, tool, color, width) => {
-      return this.sync.startShape(layerId, shapeId, tool, color, width);
+    this.canvas.onLocalStrokeStart = (layerId, shapeId, tool, color, width, type, text) => {
+      return this.sync.startShape(layerId, shapeId, tool, color, width, type, text);
     };
 
-    this.canvas.onLocalStrokeMove = (activeYShapeMap, coordinates) => {
-      this.sync.addPointsToShape(activeYShapeMap, coordinates);
+    this.canvas.onLocalStrokeMove = (activeYShapeMap, coordinates, isShape) => {
+      if (isShape) {
+        this.sync.updateShapePoints(activeYShapeMap, coordinates);
+      } else {
+        this.sync.addPointsToShape(activeYShapeMap, coordinates);
+      }
     };
 
     this.canvas.onCursorMove = (x, y) => {

@@ -21,12 +21,16 @@ export class CanvasManager {
     this.activeShapeId = null;
     this.activeShapePoints = [];
     this.activeYShape = null; // Y.Map reference
+    this.startX = 0;
+    this.startY = 0;
     
     // Local event callbacks to notify UI/Sync
-    this.onLocalStrokeStart = null; // (layerId, shapeId, tool, color, width)
-    this.onLocalStrokeMove = null; // (shapeMap, points)
+    this.onLocalStrokeStart = null; // (layerId, shapeId, tool, color, width, type, text)
+    this.onLocalStrokeMove = null; // (shapeMap, points, isShape)
     this.onLocalStrokeEnd = null; // ()
     this.onCursorMove = null; // (x, y)
+    this.onColorPicked = null; // (color)
+    this.onTextToolClick = null; // (x, y)
 
     this.initStage();
   }
@@ -138,6 +142,24 @@ export class CanvasManager {
         return;
       }
 
+      // 1. Eyedropper Tool click
+      if (this.currentTool === 'eyedropper') {
+        const color = this.pickColorAtPosition();
+        if (this.onColorPicked) {
+          this.onColorPicked(color);
+        }
+        return;
+      }
+
+      // 2. Text Tool click
+      if (this.currentTool === 'text') {
+        const pos = this.getRelativePointerPosition();
+        if (pos && this.onTextToolClick) {
+          this.onTextToolClick(pos.x, pos.y);
+        }
+        return;
+      }
+
       if (!this.activeLayerId) return;
 
       const layer = this.layers.get(this.activeLayerId);
@@ -149,21 +171,66 @@ export class CanvasManager {
       if (!pos) return;
 
       this.activeShapeId = `shape_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.startX = pos.x;
+      this.startY = pos.y;
       this.activeShapePoints = [pos.x, pos.y];
 
-      // Render temporary line locally for responsive drawing
-      this.tempLine = new Konva.Line({
-        stroke: this.currentColor,
-        strokeWidth: this.currentWidth,
-        globalCompositeOperation: this.currentTool === 'eraser' ? 'destination-out' : 'source-over',
-        lineCap: 'round',
-        lineJoin: 'round',
-        points: [...this.activeShapePoints],
-        listening: false
-      });
+      const shapeType = (this.currentTool === 'brush' || this.currentTool === 'eraser') ? 'line' : this.currentTool;
 
-      layer.add(this.tempLine);
-      layer.batchDraw();
+      // Render temporary shape locally for responsive drawing
+      if (shapeType === 'line') {
+        this.tempLine = new Konva.Line({
+          stroke: this.currentColor,
+          strokeWidth: this.currentWidth,
+          globalCompositeOperation: this.currentTool === 'eraser' ? 'destination-out' : 'source-over',
+          lineCap: 'round',
+          lineJoin: 'round',
+          points: [...this.activeShapePoints],
+          listening: false
+        });
+      } else if (shapeType === 'straight-line') {
+        this.tempLine = new Konva.Line({
+          stroke: this.currentColor,
+          strokeWidth: this.currentWidth,
+          lineCap: 'round',
+          points: [pos.x, pos.y, pos.x, pos.y],
+          listening: false
+        });
+      } else if (shapeType === 'rect') {
+        this.tempLine = new Konva.Rect({
+          x: pos.x,
+          y: pos.y,
+          width: 0,
+          height: 0,
+          stroke: this.currentColor,
+          strokeWidth: this.currentWidth,
+          listening: false
+        });
+      } else if (shapeType === 'circle') {
+        this.tempLine = new Konva.Circle({
+          x: pos.x,
+          y: pos.y,
+          radius: 0,
+          stroke: this.currentColor,
+          strokeWidth: this.currentWidth,
+          listening: false
+        });
+      } else if (shapeType === 'arrow') {
+        this.tempLine = new Konva.Arrow({
+          stroke: this.currentColor,
+          strokeWidth: this.currentWidth,
+          fill: this.currentColor,
+          pointerLength: 10,
+          pointerWidth: 10,
+          points: [pos.x, pos.y, pos.x, pos.y],
+          listening: false
+        });
+      }
+
+      if (this.tempLine) {
+        layer.add(this.tempLine);
+        layer.batchDraw();
+      }
 
       // Trigger callback to start Yjs synchronization
       if (this.onLocalStrokeStart) {
@@ -172,11 +239,13 @@ export class CanvasManager {
           this.activeShapeId,
           this.currentTool,
           this.currentColor,
-          this.currentWidth
+          this.currentWidth,
+          shapeType
         );
         // Sync initial coordinates
         if (this.activeYShape && this.onLocalStrokeMove) {
-          this.onLocalStrokeMove(this.activeYShape, [pos.x, pos.y]);
+          const initCoords = shapeType === 'line' ? [pos.x, pos.y] : [pos.x, pos.y, pos.x, pos.y];
+          this.onLocalStrokeMove(this.activeYShape, initCoords, shapeType !== 'line');
         }
       }
     });
@@ -197,10 +266,25 @@ export class CanvasManager {
         e.evt.preventDefault();
       }
 
-      this.activeShapePoints.push(normPos.x, normPos.y);
-      
-      // Update temporary visual line
-      this.tempLine.points([...this.activeShapePoints]);
+      const shapeType = (this.currentTool === 'brush' || this.currentTool === 'eraser') ? 'line' : this.currentTool;
+
+      if (shapeType === 'line') {
+        this.activeShapePoints.push(normPos.x, normPos.y);
+        this.tempLine.points([...this.activeShapePoints]);
+      } else if (shapeType === 'straight-line' || shapeType === 'arrow') {
+        this.activeShapePoints = [this.startX, this.startY, normPos.x, normPos.y];
+        this.tempLine.points([...this.activeShapePoints]);
+      } else if (shapeType === 'rect') {
+        this.activeShapePoints = [this.startX, this.startY, normPos.x, normPos.y];
+        this.tempLine.x(Math.min(this.startX, normPos.x));
+        this.tempLine.y(Math.min(this.startY, normPos.y));
+        this.tempLine.width(Math.abs(normPos.x - this.startX));
+        this.tempLine.height(Math.abs(normPos.y - this.startY));
+      } else if (shapeType === 'circle') {
+        this.activeShapePoints = [this.startX, this.startY, normPos.x, normPos.y];
+        const radius = Math.sqrt(Math.pow(normPos.x - this.startX, 2) + Math.pow(normPos.y - this.startY, 2));
+        this.tempLine.radius(radius);
+      }
       
       const layer = this.layers.get(this.activeLayerId);
       if (layer) {
@@ -209,7 +293,7 @@ export class CanvasManager {
 
       // Sync incremental coordinates with Yjs
       if (this.activeYShape && this.onLocalStrokeMove) {
-        this.onLocalStrokeMove(this.activeYShape, [normPos.x, normPos.y]);
+        this.onLocalStrokeMove(this.activeYShape, this.activeShapePoints, shapeType !== 'line');
       }
     });
 
@@ -220,28 +304,28 @@ export class CanvasManager {
       if (this.tempLine) {
         const layer = this.layers.get(this.activeLayerId);
         
-        // Destroy the temporary rendering line
+        // Destroy the temporary rendering shape
         this.tempLine.destroy();
         this.tempLine = null;
 
-        // Create the final permanent Konva.Line object
-        const permanentLine = new Konva.Line({
-          stroke: this.currentColor,
+        const shapeType = (this.currentTool === 'brush' || this.currentTool === 'eraser') ? 'line' : this.currentTool;
+
+        // Create the final permanent shape object
+        const permanentShape = this.createKonvaShape(this.activeShapeId, {
+          type: shapeType,
+          color: this.currentColor,
           strokeWidth: this.currentWidth,
           globalCompositeOperation: this.currentTool === 'eraser' ? 'destination-out' : 'source-over',
-          lineCap: 'round',
-          lineJoin: 'round',
-          points: [...this.activeShapePoints],
-          listening: false
+          points: [...this.activeShapePoints]
         });
 
-        if (layer) {
-          layer.add(permanentLine);
+        if (layer && permanentShape) {
+          layer.add(permanentShape);
           layer.batchDraw();
+          
+          // Cache the local shape reference
+          this.shapes.set(this.activeShapeId, permanentShape);
         }
-
-        // Cache the local shape reference
-        this.shapes.set(this.activeShapeId, permanentLine);
       }
 
       this.activeShapeId = null;
@@ -446,28 +530,20 @@ export class CanvasManager {
     // Prevent duplicate lines
     if (this.shapes.has(shapeId)) return;
 
-    const remoteLine = new Konva.Line({
-      id: shapeId,
-      stroke: shapeData.color,
-      strokeWidth: shapeData.strokeWidth,
-      globalCompositeOperation: shapeData.globalCompositeOperation || 'source-over',
-      lineCap: 'round',
-      lineJoin: 'round',
-      points: shapeData.points || [],
-      listening: false
-    });
+    const remoteShape = this.createKonvaShape(shapeId, shapeData);
+    if (!remoteShape) return;
 
-    layer.add(remoteLine);
+    layer.add(remoteShape);
     layer.batchDraw();
     this.updateWidgetPreview();
     
-    this.shapes.set(shapeId, remoteLine);
+    this.shapes.set(shapeId, remoteShape);
   }
 
   updateRemoteShapePoints(layerId, shapeId, pointsArray) {
-    const line = this.shapes.get(shapeId);
-    if (line) {
-      line.points(pointsArray);
+    const shape = this.shapes.get(shapeId);
+    if (shape) {
+      this.updateKonvaShapeProperties(shape, pointsArray);
       const layer = this.layers.get(layerId);
       if (layer) {
         layer.batchDraw();
@@ -496,25 +572,18 @@ export class CanvasManager {
     // 3. For existing or new shapes, update their properties
     shapesList.forEach((shapeData) => {
       const shapeId = shapeData.id;
-      let line = this.shapes.get(shapeId);
+      let shape = this.shapes.get(shapeId);
       
-      if (!line) {
+      if (!shape) {
         // Create if missing
-        line = new Konva.Line({
-          id: shapeId,
-          stroke: shapeData.color,
-          strokeWidth: shapeData.strokeWidth,
-          globalCompositeOperation: shapeData.globalCompositeOperation || 'source-over',
-          lineCap: 'round',
-          lineJoin: 'round',
-          points: shapeData.points || [],
-          listening: false
-        });
-        layer.add(line);
-        this.shapes.set(shapeId, line);
+        shape = this.createKonvaShape(shapeId, shapeData);
+        if (shape) {
+          layer.add(shape);
+          this.shapes.set(shapeId, shape);
+        }
       } else {
-        // Update points
-        line.points(shapeData.points || []);
+        // Update properties and points
+        this.updateKonvaShapeProperties(shape, shapeData.points || [], shapeData);
       }
     });
 
@@ -565,7 +634,261 @@ export class CanvasManager {
       console.error('Failed to update widget preview:', e);
     }
   }
+  createKonvaShape(shapeId, shapeData) {
+    const type = shapeData.type || 'line';
+    const color = shapeData.color || '#6366f1';
+    const strokeWidth = shapeData.strokeWidth || 2;
+    const gco = shapeData.globalCompositeOperation || 'source-over';
+    const pts = shapeData.points || [];
 
+    const baseProps = {
+      id: shapeId,
+      listening: false
+    };
+
+    if (type === 'line') {
+      return new Konva.Line({
+        ...baseProps,
+        stroke: color,
+        strokeWidth: strokeWidth,
+        globalCompositeOperation: gco,
+        lineCap: 'round',
+        lineJoin: 'round',
+        points: pts
+      });
+    } else if (type === 'straight-line') {
+      return new Konva.Line({
+        ...baseProps,
+        stroke: color,
+        strokeWidth: strokeWidth,
+        globalCompositeOperation: gco,
+        lineCap: 'round',
+        points: pts
+      });
+    } else if (type === 'rect') {
+      const x1 = pts[0] || 0;
+      const y1 = pts[1] || 0;
+      const x2 = pts[2] || 0;
+      const y2 = pts[3] || 0;
+      return new Konva.Rect({
+        ...baseProps,
+        x: Math.min(x1, x2),
+        y: Math.min(y1, y2),
+        width: Math.abs(x2 - x1),
+        height: Math.abs(y2 - y1),
+        stroke: color,
+        strokeWidth: strokeWidth,
+        globalCompositeOperation: gco
+      });
+    } else if (type === 'circle') {
+      const x1 = pts[0] || 0;
+      const y1 = pts[1] || 0;
+      const x2 = pts[2] || 0;
+      const y2 = pts[3] || 0;
+      const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      return new Konva.Circle({
+        ...baseProps,
+        x: x1,
+        y: y1,
+        radius: radius,
+        stroke: color,
+        strokeWidth: strokeWidth,
+        globalCompositeOperation: gco
+      });
+    } else if (type === 'arrow') {
+      return new Konva.Arrow({
+        ...baseProps,
+        points: pts,
+        stroke: color,
+        strokeWidth: strokeWidth,
+        fill: color,
+        pointerLength: 10,
+        pointerWidth: 10,
+        globalCompositeOperation: gco
+      });
+    } else if (type === 'text') {
+      const x = pts[0] || 0;
+      const y = pts[1] || 0;
+      return new Konva.Text({
+        ...baseProps,
+        x: x,
+        y: y,
+        text: shapeData.text || '',
+        fontSize: Math.max(12, strokeWidth * 2.5),
+        fill: color,
+        globalCompositeOperation: gco
+      });
+    }
+
+    return null;
+  }
+
+  updateKonvaShapeProperties(shape, pointsArray, shapeData = {}) {
+    if (!shape || !pointsArray || pointsArray.length === 0) return;
+
+    const className = shape.className;
+    if (className === 'Line') {
+      shape.points(pointsArray);
+    } else if (className === 'Rect') {
+      const x1 = pointsArray[0] || 0;
+      const y1 = pointsArray[1] || 0;
+      const x2 = pointsArray[2] || 0;
+      const y2 = pointsArray[3] || 0;
+      shape.x(Math.min(x1, x2));
+      shape.y(Math.min(y1, y2));
+      shape.width(Math.abs(x2 - x1));
+      shape.height(Math.abs(y2 - y1));
+    } else if (className === 'Circle') {
+      const x1 = pointsArray[0] || 0;
+      const y1 = pointsArray[1] || 0;
+      const x2 = pointsArray[2] || 0;
+      const y2 = pointsArray[3] || 0;
+      const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      shape.x(x1);
+      shape.y(y1);
+      shape.radius(radius);
+    } else if (className === 'Arrow') {
+      shape.points(pointsArray);
+    } else if (className === 'Text') {
+      shape.x(pointsArray[0] || 0);
+      shape.y(pointsArray[1] || 0);
+      if (shapeData.text) {
+        shape.text(shapeData.text);
+      }
+    }
+  }
+
+  addTextShape(x, y, text) {
+    if (!this.activeLayerId) return;
+    const layer = this.layers.get(this.activeLayerId);
+    if (!layer || !layer.visible()) return;
+
+    const shapeId = `shape_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const pts = [x, y];
+
+    const permanentText = this.createKonvaShape(shapeId, {
+      type: 'text',
+      color: this.currentColor,
+      strokeWidth: this.currentWidth,
+      points: pts,
+      text: text
+    });
+
+    if (layer && permanentText) {
+      layer.add(permanentText);
+      layer.batchDraw();
+      this.shapes.set(shapeId, permanentText);
+    }
+
+    if (this.onLocalStrokeStart) {
+      const activeYShape = this.onLocalStrokeStart(
+        this.activeLayerId,
+        shapeId,
+        'text',
+        this.currentColor,
+        this.currentWidth,
+        'text',
+        text
+      );
+      if (activeYShape && this.onLocalStrokeMove) {
+        this.onLocalStrokeMove(activeYShape, pts, true);
+      }
+    }
+    this.updateWidgetPreview();
+  }
+
+  pickColorAtPosition() {
+    const stagePos = this.stage.getPointerPosition();
+    const pos = this.getRelativePointerPosition();
+    if (!pos || !stagePos) return this.currentColor;
+
+    let closestShape = null;
+    let minDistance = 25; // 25 pixels tolerance is perfect for touch and thin lines
+
+    this.shapes.forEach((shape) => {
+      const layer = shape.getLayer();
+      if (!layer || !layer.visible()) return;
+
+      const className = shape.className;
+      if (className === 'Line' || className === 'Arrow') {
+        const pts = shape.points();
+        for (let i = 0; i < pts.length - 2; i += 2) {
+          const dist = this.getDistanceToSegment(pos.x, pos.y, pts[i], pts[i+1], pts[i+2], pts[i+3]);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestShape = shape;
+          }
+        }
+      } else if (className === 'Rect') {
+        const rx = shape.x();
+        const ry = shape.y();
+        const rw = shape.width();
+        const rh = shape.height();
+        
+        if (pos.x >= rx && pos.x <= rx + rw && pos.y >= ry && pos.y <= ry + rh) {
+          closestShape = shape;
+          minDistance = 0;
+        } else {
+          const d1 = this.getDistanceToSegment(pos.x, pos.y, rx, ry, rx + rw, ry);
+          const d2 = this.getDistanceToSegment(pos.x, pos.y, rx + rw, ry, rx + rw, ry + rh);
+          const d3 = this.getDistanceToSegment(pos.x, pos.y, rx, ry + rh, rx + rw, ry + rh);
+          const d4 = this.getDistanceToSegment(pos.x, pos.y, rx, ry, rx, ry + rh);
+          const dist = Math.min(d1, d2, d3, d4);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestShape = shape;
+          }
+        }
+      } else if (className === 'Circle') {
+        const cx = shape.x();
+        const cy = shape.y();
+        const r = shape.radius();
+        const distToCenter = Math.sqrt(Math.pow(pos.x - cx, 2) + Math.pow(pos.y - cy, 2));
+        const distToEdge = Math.abs(distToCenter - r);
+        if (distToEdge < minDistance) {
+          minDistance = distToEdge;
+          closestShape = shape;
+        }
+      } else if (className === 'Text') {
+        const tx = shape.x();
+        const ty = shape.y();
+        const tw = shape.width();
+        const th = shape.height();
+        if (pos.x >= tx && pos.x <= tx + tw && pos.y >= ty && pos.y <= ty + th) {
+          closestShape = shape;
+          minDistance = 0;
+        }
+      }
+    });
+
+    if (closestShape) {
+      if (closestShape.stroke) {
+        const c = closestShape.stroke();
+        if (c && c !== 'transparent') return c;
+      }
+      if (closestShape.fill) {
+        const c = closestShape.fill();
+        if (c && c !== 'transparent') return c;
+      }
+    }
+    
+    return this.currentColor;
+  }
+
+  getDistanceToSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.sqrt(Math.pow(px - x1, 2) + Math.pow(py - y1, 2));
+    
+    let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    
+    const projX = x1 + t * dx;
+    const projY = y1 + t * dy;
+    
+    return Math.sqrt(Math.pow(px - projX, 2) + Math.pow(py - projY, 2));
+  }
   destroy() {
     this.stage.destroy();
     this.layers.clear();
