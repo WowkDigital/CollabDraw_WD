@@ -22,7 +22,9 @@ export class SyncManager {
     this.yLayerOrder = this.doc.getArray('layerOrder');
 
     // Undo/Redo manager tracking layers and ordering
-    this.undoManager = new Y.UndoManager([this.yLayers, this.yLayerOrder]);
+    this.undoManager = new Y.UndoManager([this.yLayers, this.yLayerOrder], {
+      trackedOrigins: new Set([null, undefined])
+    });
 
     // Callback hooks for the application UI/Canvas to respond to remote changes
     this.onRemoteLayerChange = null; // (type, layerId, layerData)
@@ -373,7 +375,9 @@ export class SyncManager {
   addPointsToShape(shapeMap, coordinates) {
     const pointsArray = shapeMap.get('points');
     if (pointsArray) {
-      pointsArray.push(coordinates);
+      this.doc.transact(() => {
+        pointsArray.push(coordinates);
+      }, 'drawing');
     }
   }
 
@@ -384,7 +388,7 @@ export class SyncManager {
       this.doc.transact(() => {
         pointsArray.delete(0, pointsArray.length);
         pointsArray.push(coordinates);
-      });
+      }, 'drawing');
     }
   }
 

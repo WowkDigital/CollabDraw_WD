@@ -579,11 +579,7 @@ export class UIManager {
     };
 
     this.canvas.onLocalStrokeMove = (activeYShapeMap, coordinates, isShape) => {
-      if (isShape) {
-        this.sync.updateShapePoints(activeYShapeMap, coordinates);
-      } else {
-        this.sync.addPointsToShape(activeYShapeMap, coordinates);
-      }
+      this.sync.updateShapePoints(activeYShapeMap, coordinates);
     };
 
     this.canvas.onCursorMove = (x, y) => {
