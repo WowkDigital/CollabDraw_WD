@@ -301,7 +301,7 @@
       <div class="space-y-4">
         <div>
           <label for="room-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Room Name</label>
-          <input type="text" id="room-input" class="w-full py-3 px-4 bg-slate-950 border border-slate-800 rounded-xl focus:border-brand-500 focus:outline-none text-slate-100 text-sm font-medium transition-colors opacity-60 cursor-not-allowed" value="room 1" disabled>
+          <input type="text" id="room-input" class="w-full py-3 px-4 bg-slate-950 border border-slate-800 rounded-xl focus:border-brand-500 focus:outline-none text-slate-100 text-sm font-medium transition-colors opacity-60 cursor-not-allowed" value="Room 1" disabled>
         </div>
         <div>
           <label for="username-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Your Name</label>

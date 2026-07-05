@@ -1,5 +1,8 @@
 import { renderLayersList } from './ui-layers.js';
 import { updatePeerCursorsAndAvatars } from './ui-cursors.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+import { firebaseConfig, isFirebaseConfigured } from './firebase-webrtc-provider.js';
 
 export class UIManager {
   constructor(canvasManager, syncManager) {
@@ -76,22 +79,53 @@ export class UIManager {
 
   // 1. Initial Room Join Modal setup
   setupModal() {
-    // Suggest standard values if inputs are empty, checking URL parameters first
-    const savedName = localStorage.getItem('codraw_name') || '';
-
-    this.roomInput.value = 'room 1';
+    this.roomInput.value = 'Room 1';
     this.roomInput.disabled = true;
     this.roomInput.classList.add('opacity-60', 'cursor-not-allowed');
-    this.usernameInput.value = savedName;
+
+    // Update modal elements to show automatic loading
+    const modalTitle = this.roomModal.querySelector('h2');
+    const modalDesc = this.roomModal.querySelector('p');
+    if (modalTitle) modalTitle.textContent = 'Łączenie...';
+    if (modalDesc) modalDesc.textContent = 'Trwa automatyczne przydzielanie nazwy użytkownika i dołączanie do pokoju Room 1...';
+
+    // Disable UI interaction in the modal
+    this.usernameInput.disabled = true;
+    this.usernameInput.classList.add('opacity-60', 'cursor-not-allowed');
+    if (this.joinBtn) {
+      this.joinBtn.disabled = true;
+      this.joinBtn.textContent = 'Łączenie...';
+      this.joinBtn.classList.add('opacity-60', 'cursor-not-allowed');
+    }
 
     const joinRoom = async () => {
-      const room = 'room 1';
-      const username = this.usernameInput.value.trim();
+      const room = 'Room 1';
+      let username = 'User 1';
 
-      if (!username) {
-        alert('Please enter your name');
-        return;
+      if (isFirebaseConfigured) {
+        try {
+          const app = initializeApp(firebaseConfig);
+          const db = getDatabase(app);
+          const presenceRef = ref(db, `rooms/${room}/presence`);
+          const snapshot = await get(presenceRef);
+          
+          if (snapshot.exists()) {
+            const presenceData = snapshot.val();
+            const activeNames = Object.values(presenceData).map(p => p.name);
+            
+            let i = 1;
+            while (activeNames.includes(`User ${i}`)) {
+              i++;
+            }
+            username = `User ${i}`;
+          }
+        } catch (e) {
+          console.error('[Onboarding] Failed to query presence, using random fallback username', e);
+          username = `User ${Math.floor(Math.random() * 1000)}`;
+        }
       }
+
+      this.usernameInput.value = username;
 
       // Save user configuration for return visits
       localStorage.setItem('codraw_room', room);
@@ -137,9 +171,8 @@ export class UIManager {
       this.renderLayersList();
     };
 
-    this.joinBtn.addEventListener('click', joinRoom);
-    this.roomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
-    this.usernameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
+    // Auto-trigger join flow
+    joinRoom();
   }
 
   // 1b. Share Room Link setup
@@ -590,6 +623,9 @@ export class UIManager {
     this.sync.onRemoteLayerChange = (type, layerId, layerData) => {
       if (type === 'add') {
         this.canvas.addLayer(layerId, layerData.name, layerData.visible);
+        if (layerData.shapes) {
+          this.canvas.reconcileRemoteLayerShapes(layerId, layerData.shapes);
+        }
       } else if (type === 'update') {
         this.canvas.setLayerVisibility(layerId, layerData.visible);
         this.canvas.setLayerName(layerId, layerData.name);

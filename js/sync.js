@@ -23,7 +23,7 @@ export class SyncManager {
 
     // Undo/Redo manager tracking layers and ordering
     this.undoManager = new Y.UndoManager([this.yLayers, this.yLayerOrder], {
-      trackedOrigins: new Set([null, undefined])
+      trackedOrigins: new Set([null, undefined, 'canvas-edit'])
     });
 
     // Callback hooks for the application UI/Canvas to respond to remote changes
@@ -158,6 +158,15 @@ export class SyncManager {
               }
               // Set observer for shape array in this new layer
               this.observeShapesArray(key, layerMap.get('shapes'));
+
+              // Set point observers for any pre-existing shapes in this restored/added layer
+              const shapesArray = layerMap.get('shapes');
+              if (shapesArray) {
+                shapesArray.forEach((shapeMap) => {
+                  const shapeId = shapeMap.get('id');
+                  this.observeShapePoints(key, shapeId, shapeMap.get('points'));
+                });
+              }
             } else if (change.action === 'delete') {
               if (this.onRemoteLayerChange) {
                 this.onRemoteLayerChange('delete', key, null);
